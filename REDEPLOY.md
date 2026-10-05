@@ -18,6 +18,8 @@ When PHP first runs, it initializes missing empty datasets, including security.j
 
 Email admin accounts also require `includes/accounts.php`. Preserve the complete settings.json array: it can contain both the primary `admin` password and team accounts. Do not replace it with a single password object or an empty array. After deployment, sign in with the existing primary account and open `/admin/accounts` to issue a private activation link. New accounts are not created automatically by deploying code. The primary password is not in the repository; if access is lost, recover it through authorized server access before issuing invitations.
 
+The mobile publishing/search/admin release also requires `includes/experience.php`; deploy the complete PHP/CSS/JS release together. No SMTP or email provider is needed. Test one real, authorized submission after deployment: keep the default private contact preferences, upload a phone photo, check the receipt reference, review it in admin, and approve only when its information and permissions are verified. Verify the search result and each WhatsApp draft on a phone. Do not use fictional test dogs on production.
+
 ## Validate before reopening
 
 - Check the 14 routes in AGENTS.md over HTTPS. Verify .htaccess denies config.php, includes, tools, hidden files and Markdown documentation; storage JSON/uploads must never be directly readable. Test with an unauthenticated browser.

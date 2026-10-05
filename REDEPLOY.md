@@ -24,6 +24,12 @@ When PHP first runs, it initializes missing empty datasets, including security.j
 - Confirm adopted/reunited/expired/withdrawn listings and photos disappear from active public routes. Renewal requires confirming the situation with the owner. Test an invalid/oversized image: no success message or partially accepted submission should appear.
 - Check assets, mobile layout, WhatsApp links, robots/sitemap and server logs. Purge old CDN caches where relevant. Review private backups and retention practices.
 
+### Confirm which release is running
+
+PHP responses expose `X-Perro-Release`, also available in the HTML `perro-release` meta tag. This fingerprint is derived from application source and CSS/JS, excluding config and private storage. Compare it with the same header from an isolated preview of the merged revision. Windows/Linux line endings are normalized for this fingerprint. Stylesheet and script URLs include their content hashes, so changed assets receive new URLs automatically.
+
+If the release fingerprint differs after deployment, verify the deployed revision and document root, then clear the relevant Hostinger/CDN/PHP opcode caches. A hard refresh alone cannot correct files deployed into the wrong directory. This fingerprint does not validate production settings, operator identity or private data.
+
 ## Local verification
 
 Run php -l on every root and includes PHP file. Run node tools/privacy-smoke.cjs; Node is only used by the development test. PERRO_PHP_BIN can select the PHP executable. If local GD is installed but disabled, PERRO_PHP_GD_DIR can point to the PHP extension directory to enable it for this test. Without GD the script verifies that photo attempts fail clearly; with GD it also tests real multipart image conversion, private review, addition/removal and publication. The test copies source into an OS temp directory and uses synthetic local fixtures. It never calls production.

@@ -44,6 +44,17 @@ async function run() {
   for(const route of routes) check('route '+route,(await visitor(route)).status===200);
   for(const route of ['/config.php','/storage/data/submissions.json','/includes/legal.php','/AGENTS.md','/LEGAL-RELEASE.md','/tools/privacy-smoke.cjs','/.git/config','/assets/%2e%2e/storage/data/submissions.json','/%69ncludes/data.php']) check('private route '+route,(await visitor(route)).status===404);
   const token=html=>html.match(/name="csrf_token" value="([^"]+)"/)[1];
+  const home=await visitor('/');
+  const release=home.headers.get('x-perro-release');
+  check('release fingerprint available without private data',/^perro-[a-f0-9]{12}$/.test(release)&&home.html.includes('name="perro-release" content="'+release+'"'));
+  const cssFile=path.join(copy,'assets/css/site.css'),cssOriginal=fs.readFileSync(cssFile);
+  const oldCssUrl=home.html.match(/href="([^"]+site\.css\?v=[a-f0-9]+)"/)[1];
+  fs.appendFileSync(cssFile,'\n/* disposable cache invalidation check */\n');
+  const changedHome=await visitor('/'),newCssUrl=changedHome.html.match(/href="([^"]+site\.css\?v=[a-f0-9]+)"/)[1];
+  check('CSS changes invalidate asset URL and release fingerprint',newCssUrl!==oldCssUrl&&changedHome.headers.get('x-perro-release')!==release);
+  check('versioned CSS loads',(await visitor(newCssUrl)).status===200);
+  fs.writeFileSync(cssFile,cssOriginal);
+  check('lost and found links preselect correct form type',(await visitor('/dar-perro-en-adopcion?type=lost')).html.includes('<option value="lost" selected>')&&(await visitor('/dar-perro-en-adopcion?type=found')).html.includes('<option value="found" selected>'));
   const form=await user('/dar-perro-en-adopcion');
   check('private name selected by default',/name="name_visibility" value="private" checked/.test(form.html));
   check('public name not selected',!/name="name_visibility" value="public" checked/.test(form.html));
@@ -56,10 +67,14 @@ async function run() {
   const privacy=await visitor('/privacidad');
   check('no false automatic deletion promise',privacy.html.includes('No prometemos una supresión automática'));
   const csrf=token(form.html),version= form.html.match(/name="terms_version" value="([^"]+)"/)[1];
-  const fields={csrf_token:csrf,form_started:String(Math.floor(Date.now()/1000)-10),listing_type:'adoption',submitter_name:'PRIVATE FULL NAME SENTINEL',email:'private-owner@example.invalid',whatsapp:'0981999999',relationship:'Responsable actual',name:'LOCAL TEST DOG',department:'Central',city:'Luque',age_group:'Adulto',sex:'Macho',size:'Mediano',description:'Disposable local privacy test only; this record is never sent to production.',adult_confirm:'1',authorized_confirm:'1',photo_consent:'1',terms_accept:'1',no_sale_confirm:'1',terms_version:version,privacy_version:version,name_visibility:'private',public_display_name:'IGNORED PRIVATE ALIAS'};
+  const fields={csrf_token:csrf,form_started:String(Math.floor(Date.now()/1000)-10),listing_type:'adoption',submitter_name:'PRIVATE FULL NAME SENTINEL',email:'private-owner@example.invalid',whatsapp:'0981999999',relationship:'Responsable actual',name:'LOCAL TEST DOG',department:'Central',city:'Asunción',age_group:'Adulto',sex:'Macho',size:'Mediano',description:'Disposable local privacy test only; this record is never sent to production.',adult_confirm:'1',authorized_confirm:'1',photo_consent:'1',terms_accept:'1',no_sale_confirm:'1',terms_version:version,privacy_version:version,name_visibility:'private',public_display_name:'IGNORED PRIVATE ALIAS'};
   check('bad CSRF returns 419',(await user('/enviar-perro',{...fields,csrf_token:'invalid'})).status===419);
-  for(const change of [{no_sale_confirm:'0'},{photo_consent:'on'},{terms_version:'old'},{privacy_version:'old'},{name_visibility:'public',public_display_name:''},{description:'too short'},{size:'forged size'},{age_group:'forged age'},{relationship:'forged role'},{listing_type:'sell'},{listing_type:'found',last_location:'',incident_date:''},{listing_type:'lost',last_location:'Central',incident_date:'2099-01-01'},{listing_type:'lost',last_location:'Central',incident_date:'2026-02-30'}]) {
+  for(const change of [{no_sale_confirm:'0'},{photo_consent:'on'},{terms_version:'old'},{privacy_version:'old'},{name_visibility:'public',public_display_name:''},{description:'too short',size:'Grande',reason:'Contexto de prueba para conservar.'},{size:'forged size'},{age_group:'forged age'},{relationship:'forged role'},{listing_type:'sell'},{listing_type:'found',last_location:'',incident_date:''},{listing_type:'lost',last_location:'Central',incident_date:'2099-01-01'},{listing_type:'lost',last_location:'Central',incident_date:'2026-02-30'}]) {
     await user('/enviar-perro',{...fields,...change}); check('reject '+JSON.stringify(change),data('submissions').length===0);
+    if (change.description) {
+      const retry=await user('/dar-perro-en-adopcion');
+      check('validation retry preserves selected size and context',retry.html.includes('<option value="Grande" selected>')&&retry.html.includes('Contexto de prueba para conservar.'));
+    }
   }
   await user('/enviar-perro',{...fields,public_whatsapp:'0'});
   const submission=data('submissions')[0];
@@ -76,6 +91,15 @@ async function run() {
   check('no private name/email/phone leak after approval',![fields.submitter_name,fields.email,'595981999999',fields.public_display_name].some(value=>profile.html.includes(value)));
   check('private-contact profile offers working mediation link',profile.html.includes('Consultar al equipo de Perro')&&profile.html.includes('https://wa.me/595992279599'));
   const firstDog=dog;
+  const cityResults=await visitor('/perros?city=asuncion');
+  check('city search accepts missing accents',cityResults.html.includes(firstDog.name));
+  check('search size is optional',!/<select name="size" required/.test(cityResults.html));
+  check('selected search size retained',(await visitor('/perros?size=Mediano')).html.includes('<option value="Mediano" selected>'));
+  check('text search accepts upper case and missing accents',(await visitor('/perros?q=ASUNCION')).html.includes(firstDog.name));
+  check('nonmatching search excludes listing',!(await visitor('/perros?city=Encarnacion')).html.includes(firstDog.name));
+  const queueHtml=(await admin('/admin?queue=approved')).html.split('id="solicitudes"')[1].split('id="publicadas"')[0];
+  const pendingHtml=(await admin('/admin?queue=pending')).html.split('id="solicitudes"')[1].split('id="publicadas"')[0];
+  check('admin status filter includes only requested submissions',queueHtml.includes(firstDog.name)&&!pendingHtml.includes(firstDog.name));
   await Promise.all([approve(submission.id),approve(submission.id)]);
   check('duplicate and concurrent approval creates exactly one dog',data('dogs').length===1&&data('dogs')[0].id===firstDog.id);
   await admin('/admin/action',{csrf_token:adminCsrf,dataset:'submissions',id:submission.id,action:'reject'});

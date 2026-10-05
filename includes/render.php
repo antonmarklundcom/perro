@@ -16,11 +16,13 @@ function page_meta(string $title, string $description, string $path = '', bool $
 
 function project_whatsapp_message(): string
 {
+    if (!empty($GLOBALS['perro_storage_error'])) return 'Hola, necesito ayuda con una operación en Perro.com.py.';
     $path = request_path();
     if (preg_match('#^perro/([a-z0-9-]+)$#', $path, $matches) && function_exists('public_dog_by_slug')) {
         $dog = public_dog_by_slug($matches[1]);
         if ($dog) {
-            return 'Hola, vi la ficha de ' . $dog['name'] . ' en Perro.com.py y quisiera consultar sobre su adopción responsable.';
+            $type = listing_options()['listing_type'][$dog['listing_type'] ?? 'adoption'] ?? 'Aviso';
+            return 'Hola, vi la ficha de ' . $dog['name'] . ' (' . $type . ') en Perro.com.py y quisiera consultar o aportar información.';
         }
     }
 
@@ -72,7 +74,7 @@ function render_header(array $meta): void
     <meta property="og:image" content="<?= h($meta['image']) ?>">
     <meta name="theme-color" content="#17233b">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="/assets/css/site.css?v=2">
+    <link rel="stylesheet" href="/assets/css/site.css?v=3">
 </head>
 <body class="<?= $isAdminPage ? 'admin-page' : 'public-page' ?>">
 <a class="skip-link" href="#contenido">Saltar al contenido</a>

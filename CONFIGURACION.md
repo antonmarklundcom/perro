@@ -12,6 +12,9 @@
 - [ ] Probar el botón flotante de WhatsApp desde inicio, publicación, perdidos y una ficha individual.
 - [ ] Confirmar que `+595 992 279 599` pertenece a la persona que administrará las consultas.
 - [ ] Hacer una copia de la carpeta `storage` antes de actualizar el sitio.
+- [ ] Completar identidad, domicilio de contacto y canal de privacidad del responsable según `LEGAL-RELEASE.md`.
+- [ ] Confirmar que el formulario nuevo mantiene nombre y WhatsApp privados por defecto.
+- [ ] Probar retiro y vencimiento de una ficha y sus fotos; no cargar copias de datos locales en producción.
 
 ## Valores configurables
 

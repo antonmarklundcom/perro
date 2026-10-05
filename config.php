@@ -9,6 +9,11 @@ return [
     'timezone' => 'America/Asuncion',
     'demo_mode' => false,
     'contact_whatsapp' => '595992279599',
+    // Datos públicos del responsable. Completalos antes de publicar esta versión.
+    'operator_name' => (getenv('PERRO_OPERATOR_NAME') ?: ''),
+    'operator_address' => (getenv('PERRO_OPERATOR_ADDRESS') ?: ''),
+    'operator_ruc' => (getenv('PERRO_OPERATOR_RUC') ?: ''),
+    'privacy_email' => (getenv('PERRO_PRIVACY_EMAIL') ?: ''),
     'admin_username' => 'admin',
     // Cambiá esta credencial después del primer ingreso. La contraseña inicial
     // se entrega fuera del ZIP para que no quede publicada en el servidor.

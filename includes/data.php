@@ -154,7 +154,7 @@ function record_moderation(string $action, string $recordId, string $note = ''):
         'action' => $action,
         'record_id' => $recordId,
         'note' => $note,
-        'admin' => 'admin',
+        'admin' => ($_SESSION['perro_admin'] ?? false) === true ? current_admin_account_id() : 'system',
         'created_at' => now_iso(),
     ]);
 }

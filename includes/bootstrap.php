@@ -35,7 +35,7 @@ function perro_release_id(): string
     static $id;
     if ($id === null) {
         $hashes = [];
-        foreach (['index.php', 'router.php', 'includes/bootstrap.php', 'includes/data.php', 'includes/legal.php', 'includes/moderation.php', 'includes/render.php', 'assets/css/site.css', 'assets/js/site.js'] as $file) {
+        foreach (['index.php', 'router.php', 'includes/bootstrap.php', 'includes/data.php', 'includes/legal.php', 'includes/moderation.php', 'includes/accounts.php', 'includes/render.php', 'assets/css/site.css', 'assets/js/site.js'] as $file) {
             $hashes[] = hash('sha256', str_replace("\r\n", "\n", file_get_contents(PERRO_ROOT . '/' . $file)));
         }
         $id = 'perro-' . substr(hash('sha256', implode('', $hashes)), 0, 12);
@@ -147,6 +147,11 @@ function take_flash(): ?array
 function is_admin(): bool
 {
     if (($_SESSION['perro_admin'] ?? false) !== true) return false;
+    $accountId = current_admin_account_id();
+    if ($accountId !== 'admin') {
+        $account = find_record('settings', $accountId);
+        if (!$account || empty($account['active']) || !empty($account['disabled'])) { unset($_SESSION['perro_admin']); return false; }
+    }
     if (($_SESSION['admin_last_seen'] ?? 0) < time() - 1800
         || ($_SESSION['admin_started'] ?? 0) < time() - 28800
         || !hash_equals(admin_credential_version(), (string) ($_SESSION['admin_version'] ?? ''))) {
@@ -157,10 +162,23 @@ function is_admin(): bool
     return true;
 }
 
-function admin_credential_version(): string
+function current_admin_account_id(): string
+{
+    return is_string($_SESSION['admin_account_id'] ?? null) ? $_SESSION['admin_account_id'] : 'admin';
+}
+
+function password_input(string $key): string
+{
+    $value = $_POST[$key] ?? '';
+    return is_string($value) && strlen($value) <= 300 ? $value : '';
+}
+
+function admin_credential_version(?string $accountId = null): string
 {
     global $config;
-    $settings = find_record('settings', 'admin');
+    $accountId ??= current_admin_account_id();
+    $settings = find_record('settings', $accountId);
+    if ($accountId !== 'admin') return hash('sha256', $accountId . '|' . ($settings['password_hash'] ?? '') . '|' . (int) ($settings['active'] ?? false) . '|' . (int) ($settings['disabled'] ?? false));
     return hash('sha256', (string) ($settings['password_hash'] ?? $config['admin_password_sha256']));
 }
 
@@ -181,29 +199,34 @@ function verify_admin_login(string $username, string $password): bool
         if (!is_array($buckets)) throw new RuntimeException('No se puede leer el control de acceso.');
         $buckets = array_filter($buckets, static fn(array $b): bool => ($b['started'] ?? 0) > time() - 900);
         // Use the server-observed address, never an untrusted forwarded header.
-        $key = hash_hmac('sha256', (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'), admin_credential_version());
+        $key = hash_hmac('sha256', (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'), admin_credential_version('admin'));
         $bucket = $buckets[$key] ?? ['started' => time(), 'count' => 0];
         if ($bucket['count'] >= 10) return false;
         $bucket['count']++;
-        $ok = hash_equals((string) $config['admin_username'], $username) && verify_admin_password($password);
+        $accountId = hash_equals((string) $config['admin_username'], $username) ? 'admin' : 'admin-user-' . hash('sha256', strtolower(trim($username)));
+        $ok = verify_admin_password($password, $accountId);
         if ($ok) unset($buckets[$key]); else $buckets[$key] = $bucket;
         if (count($buckets) > 2000) $buckets = array_slice($buckets, -2000, null, true);
         if (@file_put_contents($file, json_encode($buckets), LOCK_EX) === false) {
             throw new RuntimeException('No se pudo guardar el control de acceso.');
         }
+        if ($ok) $_SESSION['admin_account_id'] = $accountId;
         return $ok;
     });
 }
 
-function verify_admin_password(string $password): bool
+function verify_admin_password(string $password, ?string $accountId = null): bool
 {
     global $config;
+    $accountId ??= current_admin_account_id();
     if (function_exists('find_record')) {
-        $settings = find_record('settings', 'admin');
+        $settings = find_record('settings', $accountId);
+        if ($accountId !== 'admin' && (!$settings || empty($settings['active']) || !empty($settings['disabled']))) return false;
         if (!empty($settings['password_hash'])) {
             return password_verify($password, (string) $settings['password_hash']);
         }
     }
+    if ($accountId !== 'admin') return false;
     return hash_equals((string) $config['admin_password_sha256'], hash('sha256', $password));
 }
 

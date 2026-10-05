@@ -133,7 +133,7 @@ function public_dogs(?string $listingType = null): array
         }
         return $listingType === null || ($dog['listing_type'] ?? 'adoption') === $listingType;
     });
-    usort($dogs, static fn(array $a, array $b): int => strcmp((string) ($b['published_at'] ?? ''), (string) ($a['published_at'] ?? '')));
+    usort($dogs, static fn(array $a, array $b): int => strtotime((string) ($b['published_at'] ?? '')) <=> strtotime((string) ($a['published_at'] ?? '')));
     return array_values($dogs);
 }
 

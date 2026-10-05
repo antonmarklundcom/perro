@@ -22,6 +22,10 @@ Para actualizar el sitio existente desde Git, seguí **REDEPLOY.md** y **LEGAL-R
 
 ## Flujo
 
+El formulario público funciona sin crear una cuenta y sin correo obligatorio. El WhatsApp privado permite contactar al responsable. Con JavaScript, se completa en cuatro pasos con validación, resumen de privacidad y vistas previas de fotos; también se puede abrir completo. Sin JavaScript sigue siendo un formulario normal. Los navegadores compatibles reducen fotos grandes antes de enviarlas; PHP vuelve a validar y limpiar cada imagen. Si hay errores del servidor, se conservan los textos, pero las fotos deben seleccionarse nuevamente.
+
+La búsqueda incluye ciudad, departamento, edad, tamaño, sexo, disponibilidad y orden, con 12 fichas por página. Los avisos perdidos/encontrados también tienen búsqueda y filtro por tipo. Las sugerencias de ubicación salen de avisos públicos reales. Las páginas con filtros llevan `noindex,follow`; la paginación sin filtros tiene su propia URL canónica. Las fichas incluyen rutas de navegación estructuradas y botones para compartir; no se presentan como productos en venta.
+
 1. Una persona completa `/dar-perro-en-adopcion`.
 2. La ficha se guarda como pendiente y no se publica.
 3. La administración ingresa en `/admin`.
@@ -38,6 +42,8 @@ Desde `/admin`, la cuenta principal entra en **Cuentas del equipo** (`/admin/acc
 Las cuentas del equipo pueden revisar, editar y publicar fichas, gestionar reportes, exportar fichas y cambiar su propia contraseña. Solo la cuenta principal puede invitar o retirar accesos. Los cambios de contraseña invalidan otras sesiones de esa cuenta y conservan las sesiones de las demás personas. Retirar acceso invalida sesiones e invitaciones; para recuperar una cuenta del equipo, retirale el acceso y creá un enlace nuevo. Los datos de cuentas se guardan en el archivo protegido de ajustes; no se publican en Git.
 
 ## WhatsApp
+
+El panel móvil abre en **Pendientes** y separa revisión, avisos, reportes y contraseña. Tiene búsqueda privada por perro, ciudad, referencia o responsable. Cada solicitud permite revisar sus fotos y abrir borradores de WhatsApp para consultar datos, pedir fotos, confirmar vigencia o avisar una publicación. El equipo revisa y envía esos mensajes manualmente. El correo usado para identificar una cuenta de administración no requiere un servicio de envío de emails.
 
 - El número general configurado es `+595 992 279 599`.
 - La cabecera, el pie y el botón flotante usan mensajes según la página visitada. El hero permite adoptar o publicar; el botón flotante se oculta en los formularios y las fichas para no tapar campos.

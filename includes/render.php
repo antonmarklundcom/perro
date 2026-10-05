@@ -88,6 +88,11 @@ function render_header(array $meta): void
     <meta property="og:description" content="<?= h($meta['description']) ?>">
     <meta property="og:url" content="<?= h($meta['canonical']) ?>">
     <meta property="og:image" content="<?= h($meta['image']) ?>">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="<?= h($meta['title']) ?>">
+    <meta name="twitter:description" content="<?= h($meta['description']) ?>">
+    <meta name="twitter:image" content="<?= h($meta['image']) ?>">
+    <?php render_public_schema($meta); ?>
     <meta name="theme-color" content="#193d32">
     <meta name="perro-release" content="<?= h(perro_release_id()) ?>">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -103,11 +108,15 @@ function render_header(array $meta): void
         </a>
         <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav"><span></span><span></span><span></span><span class="sr-only">Abrir menú</span></button>
         <nav id="site-nav" class="site-nav" aria-label="Navegación principal">
+            <?php if ($isAdminPage): ?>
+            <a href="/admin">Panel</a><a href="/" target="_blank" rel="noopener noreferrer">Ver sitio ↗</a>
+            <?php else: ?>
             <a href="/perros"<?= in_array(request_path(), ['perros', 'cachorros-en-adopcion', 'perros-de-raza-en-adopcion'], true) ? ' aria-current="page"' : '' ?>>Adoptá</a>
             <a href="/perros-perdidos-paraguay"<?= request_path() === 'perros-perdidos-paraguay' ? ' aria-current="page"' : '' ?>>Perdidos y encontrados</a>
             <a href="/como-funciona"<?= request_path() === 'como-funciona' ? ' aria-current="page"' : '' ?>>Cómo funciona</a>
             <?php if (!$isAdminPage && $whatsappUrl): ?><a class="nav-whatsapp" href="<?= h($whatsappUrl) ?>" target="_blank" rel="noopener noreferrer">WhatsApp</a><?php endif; ?>
             <a class="button button-small button-coral" href="/dar-perro-en-adopcion">Publicá un aviso</a>
+            <?php endif; ?>
         </nav>
     </div>
 </header>
@@ -132,6 +141,7 @@ function render_footer(): void
         <div>
             <h2>Explorá</h2>
             <a href="/perros">Perros en adopción</a>
+            <a href="/cachorros-en-adopcion">Cachorros en adopción</a>
             <a href="/dar-perro-en-adopcion">Dar un perro en adopción</a>
             <a href="/centros-de-adopcion">Centros y organizaciones</a>
         </div>

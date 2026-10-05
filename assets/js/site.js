@@ -19,7 +19,7 @@
     window.matchMedia('(min-width: 901px)').addEventListener('change', function () { setOpen(false); });
   }
 
-  const ownerForm = document.querySelector('.submission-form');
+  const ownerForm = document.querySelector('form[action="/enviar-perro"]');
   if (ownerForm) {
     const type = ownerForm.querySelector('[name="listing_type"]');
     const incident = ownerForm.querySelector('.incident-fields');

@@ -179,7 +179,7 @@ fieldset > :last-child { margin-bottom: 0; }
 .admin-title h1, .admin-title .eyebrow { color: white; }
 .admin-title h1 { font-size: clamp(1.8rem,3vw,2.5rem); margin: 0; }
 .admin-title .eyebrow { color: #d8e5dc; }
-.admin-actions, .admin-actions form { display: flex; gap: 10px; }
+.admin-actions, .admin-actions form { display: flex; gap: 10px; flex-wrap: wrap; }
 .admin-title .button { border-color: #d8e5dc; }
 .admin-title .button-secondary { color: white; }
 .admin-title .button-secondary:hover { background: var(--navy-2); }
@@ -191,6 +191,7 @@ fieldset > :last-child { margin-bottom: 0; }
 .admin-block { margin: 40px 0; scroll-margin-top: 90px; }
 .queue-filter { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-bottom: 24px; }
 .queue-filter label { min-width: 220px; }
+.account-form { margin: 28px 0; }
 .admin-list { display: grid; gap: 16px; }
 .admin-card { display: grid; grid-template-columns: minmax(0,1fr) minmax(220px,.48fr); gap: 28px; align-items: start; padding: 24px; background: white; border: 1px solid var(--line); border-radius: 16px; }
 .admin-card h3 { margin: 10px 0 6px; font-size: 1.4rem; }

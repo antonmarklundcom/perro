@@ -7,6 +7,7 @@ require __DIR__ . '/includes/data.php';
 require __DIR__ . '/includes/render.php';
 require __DIR__ . '/includes/legal.php';
 require __DIR__ . '/includes/moderation.php';
+require __DIR__ . '/includes/accounts.php';
 
 $path = request_path();
 if (method_is_post() && ini_bytes((string) ini_get('post_max_size')) > 0
@@ -14,6 +15,7 @@ if (method_is_post() && ini_bytes((string) ini_get('post_max_size')) > 0
     render_error_page('El envío es demasiado grande', 'Reducí las fotos o enviá menos archivos. El servidor rechazó el tamaño total del envío.', 413); exit;
 }
 admin_edit_routes($path);
+admin_account_routes($path);
 
 if ($path === 'robots.txt') {
     header('Content-Type: text/plain; charset=utf-8');
@@ -201,7 +203,7 @@ if ($path === 'reportar' && method_is_post()) {
 
 if ($path === 'admin/login' && method_is_post()) {
     require_csrf();
-    if (verify_admin_login(text('username', 100), text('password', 300))) {
+    if (verify_admin_login(text('username', 180), password_input('password'))) {
         session_regenerate_id(true);
         $_SESSION['perro_admin'] = true;
         $_SESSION['admin_started'] = $_SESSION['admin_last_seen'] = time();
@@ -215,7 +217,7 @@ if ($path === 'admin/login' && method_is_post()) {
 
 if ($path === 'admin/logout' && method_is_post()) {
     require_csrf();
-    unset($_SESSION['perro_admin']);
+    unset($_SESSION['perro_admin'], $_SESSION['admin_account_id'], $_SESSION['admin_version'], $_SESSION['admin_started'], $_SESSION['admin_last_seen']);
     session_regenerate_id(true);
     redirect('admin');
 }
@@ -225,22 +227,8 @@ if ($path === 'admin/action' && method_is_post()) {
     require_csrf();
     $action = text('action', 40);
     if ($action === 'change_password') {
-        $currentPassword = text('current_password', 300);
-        $newPassword = text('new_password', 300);
-        $confirmPassword = text('confirm_password', 300);
-        if (!verify_admin_password($currentPassword)) {
-            set_flash('error', 'La contraseña actual no coincide.');
-        } elseif (strlen($newPassword) < 14) {
-            set_flash('error', 'La nueva contraseña debe tener al menos 14 caracteres.');
-        } elseif (!hash_equals($newPassword, $confirmPassword)) {
-            set_flash('error', 'La confirmación no coincide con la nueva contraseña.');
-        } elseif (save_record('settings', ['id' => 'admin', 'password_hash' => password_hash($newPassword, PASSWORD_DEFAULT), 'updated_at' => now_iso()])) {
-            $_SESSION['admin_version'] = admin_credential_version();
-            record_moderation('password_changed', 'admin');
-            set_flash('success', 'Contraseña actualizada. Guardala en un lugar seguro.');
-        } else {
-            set_flash('error', 'No se pudo guardar la nueva contraseña. Revisá los permisos de storage/data.');
-        }
+        $result = change_admin_password(password_input('current_password'), password_input('new_password'), password_input('confirm_password'));
+        set_flash($result[0], $result[1]);
         redirect('admin');
     }
     $dataset = text('dataset', 30);
@@ -409,7 +397,7 @@ if (isset($contentPages[$path])) {
 if ($path === 'admin') {
     render_header(page_meta('Administración | Perro', 'Panel privado de moderación.', 'admin', false));
     if (!is_admin()) {
-        ?><section class="section"><div class="shell login-card"><span class="eyebrow">Acceso privado</span><h1>Administración</h1><p>Solo para las personas que revisan y publican fichas.</p><form method="post" action="/admin/login"><?= csrf_field() ?><label>Usuario<input name="username" required autocomplete="username"></label><label>Contraseña<input type="password" name="password" required autocomplete="current-password"></label><button class="button button-full" type="submit">Ingresar</button></form></div></section><?php
+        ?><section class="section"><div class="shell login-card"><span class="eyebrow">Acceso privado</span><h1>Administración</h1><p>Solo para las personas que revisan y publican fichas.</p><form method="post" action="/admin/login"><?= csrf_field() ?><label>Correo o usuario principal<input name="username" required maxlength="180" autocomplete="username"></label><label>Contraseña<input type="password" name="password" required autocomplete="current-password"></label><button class="button button-full" type="submit">Ingresar</button></form></div></section><?php
         render_footer(); exit;
     }
     $submissions = read_dataset('submissions');
@@ -421,7 +409,7 @@ if ($path === 'admin') {
     $visibleSubmissions = $queue === 'all' ? $submissions : array_values(array_filter($submissions, static fn(array $s): bool => ($s['status'] ?? '') === $queue));
     $publishedCount = count(public_dogs());
     $openReports = count(array_filter($reports, static fn(array $r): bool => ($r['status'] ?? '') === 'open'));
-    ?><section class="admin-hero"><div class="shell admin-title"><div><span class="eyebrow">Panel privado</span><h1>Moderación de Perro</h1></div><div class="admin-actions"><a class="button button-small button-secondary" href="/admin/export.csv">Exportar CSV</a><form method="post" action="/admin/logout"><?= csrf_field() ?><button class="button button-small" type="submit">Cerrar sesión</button></form></div></div></section><section class="section admin-section"><div class="shell"><div class="stats"><article><span>Pendientes</span><strong><?= $pendingCount ?></strong></article><article><span>Publicados</span><strong><?= $publishedCount ?></strong></article><article><span>Reportes abiertos</span><strong><?= $openReports ?></strong></article></div>
+    ?><section class="admin-hero"><div class="shell admin-title"><div><span class="eyebrow">Panel privado</span><h1>Moderación de Perro</h1></div><div class="admin-actions"><?php if (current_admin_account_id() === 'admin'): ?><a class="button button-small button-secondary" href="/admin/accounts">Cuentas del equipo</a><?php endif; ?><a class="button button-small button-secondary" href="/admin/export.csv">Exportar CSV</a><form method="post" action="/admin/logout"><?= csrf_field() ?><button class="button button-small" type="submit">Cerrar sesión</button></form></div></div></section><section class="section admin-section"><div class="shell"><div class="stats"><article><span>Pendientes</span><strong><?= $pendingCount ?></strong></article><article><span>Publicados</span><strong><?= $publishedCount ?></strong></article><article><span>Reportes abiertos</span><strong><?= $openReports ?></strong></article></div>
     <nav class="button-row" aria-label="Secciones de administración"><a class="button button-small button-secondary" href="#solicitudes">Solicitudes</a><a class="button button-small button-secondary" href="#publicadas">Fichas de perros</a><a class="button button-small button-secondary" href="#reportes">Reportes</a><a class="button button-small button-secondary" href="#clave">Contraseña</a></nav>
     <div class="admin-block" id="solicitudes">
         <div class="section-head"><div><span class="eyebrow">Cola de revisión</span><h2>Solicitudes</h2></div></div>

@@ -72,7 +72,7 @@ function render_header(array $meta): void
     global $config;
     $flash = take_flash();
     $whatsappUrl = project_whatsapp_url();
-    $isAdminPage = request_path() === 'admin' || str_starts_with(request_path(), 'admin/');
+    $isAdminPage = request_path() === 'admin' || request_path() === 'activar-admin' || str_starts_with(request_path(), 'admin/');
     ?><!doctype html>
 <html lang="es-PY">
 <head>
@@ -120,7 +120,7 @@ function render_footer(): void
 {
     global $config;
     $whatsappUrl = project_whatsapp_url();
-    $isAdminPage = request_path() === 'admin' || str_starts_with(request_path(), 'admin/');
+    $isAdminPage = request_path() === 'admin' || request_path() === 'activar-admin' || str_starts_with(request_path(), 'admin/');
     ?>
 </main>
 <footer class="site-footer">

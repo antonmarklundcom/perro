@@ -16,6 +16,8 @@ Use the configured Hostinger Git deployment from main. Verify its behavior prese
 
 When PHP first runs, it initializes missing empty datasets, including security.json. Existing records are kept. A global application.lock and private transaction journal serialize writes/recovery. Do not make concurrent hand edits to JSON while PHP is writing. Legacy public full names are hidden unless explicit name consent exists. Old pending requests lacking current policy acceptance must be resubmitted by their owner; an admin cannot accept the rules on their behalf.
 
+Email admin accounts also require `includes/accounts.php`. Preserve the complete settings.json array: it can contain both the primary `admin` password and team accounts. Do not replace it with a single password object or an empty array. After deployment, sign in with the existing primary account and open `/admin/accounts` to issue a private activation link. New accounts are not created automatically by deploying code. The primary password is not in the repository; if access is lost, recover it through authorized server access before issuing invitations.
+
 ## Validate before reopening
 
 - Check the 14 routes in AGENTS.md over HTTPS. Verify .htaccess denies config.php, includes, tools, hidden files and Markdown documentation; storage JSON/uploads must never be directly readable. Test with an unauthenticated browser.

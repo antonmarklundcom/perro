@@ -29,6 +29,14 @@ Para actualizar el sitio existente desde Git, seguí **REDEPLOY.md** y **LEGAL-R
 5. La administración puede revisar fotos privadas, editar datos y fotos, retirar permisos de contacto y gestionar estados según el tipo de aviso. Adoptados y reencontrados dejan de aparecer públicamente. Para renovar o reabrir un aviso, debe confirmar su vigencia con el responsable.
 6. Repetir una aprobación no duplica ni reabre una ficha. Las solicitudes antiguas sin aceptación de las reglas actuales necesitan un nuevo envío del responsable.
 
+## Cuentas de administración
+
+La cuenta principal conserva el usuario `admin` y su contraseña de producción. No hay una contraseña incluida en Git. El hash de `storage/data/settings.json`, registro `id: admin`, tiene prioridad sobre `PERRO_ADMIN_PASSWORD_SHA256`. Un hash no permite recuperar la contraseña original; si se perdió el acceso, la persona con acceso al servidor debe restablecerlo preservando los demás registros y las copias de seguridad.
+
+Desde `/admin`, la cuenta principal entra en **Cuentas del equipo** (`/admin/accounts`), escribe el nombre y correo de la persona e invita con un enlace privado. El enlace vence en 24 horas, funciona una vez y se muestra una sola vez. Compartilo por un canal privado; no hay envío automático de correos. La persona invitada elige una contraseña de al menos 14 caracteres y después ingresa en `/admin` con su correo.
+
+Las cuentas del equipo pueden revisar, editar y publicar fichas, gestionar reportes, exportar fichas y cambiar su propia contraseña. Solo la cuenta principal puede invitar o retirar accesos. Los cambios de contraseña invalidan otras sesiones de esa cuenta y conservan las sesiones de las demás personas. Retirar acceso invalida sesiones e invitaciones; para recuperar una cuenta del equipo, retirale el acceso y creá un enlace nuevo. Los datos de cuentas se guardan en el archivo protegido de ajustes; no se publican en Git.
+
 ## WhatsApp
 
 - El número general configurado es `+595 992 279 599`.

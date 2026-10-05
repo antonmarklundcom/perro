@@ -21,13 +21,28 @@ header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header("Permissions-Policy: geolocation=(), microphone=(), camera=()");
-header("Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; form-action 'self'; base-uri 'self'; frame-ancestors 'self'");
+header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'; form-action 'self'; base-uri 'self'; frame-ancestors 'self'");
 header('Cache-Control: no-store');
 
 const PERRO_ROOT = __DIR__ . '/..';
 const PERRO_STORAGE = PERRO_ROOT . '/storage';
 const PERRO_DATA = PERRO_STORAGE . '/data';
 const PERRO_UPLOADS = PERRO_STORAGE . '/uploads';
+
+// Fingerprint application files only; never include credentials or production data.
+function perro_release_id(): string
+{
+    static $id;
+    if ($id === null) {
+        $hashes = [];
+        foreach (['index.php', 'router.php', 'includes/bootstrap.php', 'includes/data.php', 'includes/legal.php', 'includes/moderation.php', 'includes/render.php', 'assets/css/site.css', 'assets/js/site.js'] as $file) {
+            $hashes[] = hash('sha256', str_replace("\r\n", "\n", file_get_contents(PERRO_ROOT . '/' . $file)));
+        }
+        $id = 'perro-' . substr(hash('sha256', implode('', $hashes)), 0, 12);
+    }
+    return $id;
+}
+header('X-Perro-Release: ' . perro_release_id());
 
 foreach ([PERRO_STORAGE, PERRO_DATA, PERRO_UPLOADS] as $directory) {
     if (!is_dir($directory)) {

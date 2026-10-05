@@ -32,7 +32,7 @@ Para actualizar el sitio existente desde Git, seguí **REDEPLOY.md** y **LEGAL-R
 ## WhatsApp
 
 - El número general configurado es `+595 992 279 599`.
-- La cabecera, el hero y el botón flotante usan mensajes distintos según la página visitada.
+- La cabecera, el pie y el botón flotante usan mensajes según la página visitada. El hero permite adoptar o publicar; el botón flotante se oculta en los formularios y las fichas para no tapar campos.
 - En una ficha individual, el mensaje incluye el nombre del perro.
 - Dentro de `/admin`, cada solicitud tiene un botón para escribir al remitente con el nombre del perro y la referencia ya incluidos.
 - WhatsApp no aprueba ni publica nada automáticamente: las decisiones siguen ocurriendo dentro de `/admin`.

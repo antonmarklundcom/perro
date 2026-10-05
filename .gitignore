@@ -1,0 +1,9 @@
+# Local secrets and runtime data
+.env
+.env.*
+!.env.example
+config.local.php
+storage/data/*
+storage/uploads/*
+!storage/uploads/.gitkeep
+*.log

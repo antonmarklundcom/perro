@@ -288,3 +288,6 @@ summary { cursor: pointer; color: var(--navy); font-weight: 800; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
 }
+
+/* Private moderation photo review */
+.review-photos{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin:1rem 0}.review-photos img{width:100%;height:180px;object-fit:contain;background:#f3f5f7;border-radius:12px}.review-photos span{display:flex;gap:.5rem;align-items:center}.admin-card-actions .check{max-width:240px;font-size:.85rem}.admin-card-actions form{max-width:260px}

@@ -22,6 +22,7 @@ header('X-Frame-Options: SAMEORIGIN');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header("Permissions-Policy: geolocation=(), microphone=(), camera=()");
 header("Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; form-action 'self'; base-uri 'self'; frame-ancestors 'self'");
+header('Cache-Control: no-store');
 
 const PERRO_ROOT = __DIR__ . '/..';
 const PERRO_STORAGE = PERRO_ROOT . '/storage';
@@ -34,10 +35,14 @@ foreach ([PERRO_STORAGE, PERRO_DATA, PERRO_UPLOADS] as $directory) {
     }
 }
 
-foreach (['dogs', 'submissions', 'reports', 'moderation', 'settings'] as $dataset) {
+foreach (['dogs', 'submissions', 'reports', 'moderation', 'settings', 'security'] as $dataset) {
     $file = PERRO_DATA . '/' . $dataset . '.json';
     if (!is_file($file)) {
-        @file_put_contents($file, "[]\n", LOCK_EX);
+        $newFile = @fopen($file, 'x');
+        if ($newFile) {
+            fwrite($newFile, "[]\n");
+            fclose($newFile);
+        }
     }
 }
 
@@ -50,7 +55,8 @@ function text(string $key, int $max = 5000): string
 {
     $input = $_POST[$key] ?? '';
     $value = is_string($input) ? trim($input) : '';
-    return function_exists('mb_substr') ? mb_substr($value, 0, $max) : substr($value, 0, $max);
+    if (function_exists('mb_substr')) return mb_substr($value, 0, $max);
+    return preg_match('/^.{0,' . max(0, $max) . '}/us', $value, $match) === 1 ? $match[0] : '';
 }
 
 function checked(string $key): bool
@@ -66,7 +72,7 @@ function now_iso(): string
 function request_path(): string
 {
     if (isset($_GET['path'])) {
-        return trim((string) $_GET['path'], '/');
+        return is_string($_GET['path']) ? trim($_GET['path'], '/') : '';
     }
     $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/';
     return trim(rawurldecode($path), '/');
@@ -125,7 +131,22 @@ function take_flash(): ?array
 
 function is_admin(): bool
 {
-    return ($_SESSION['perro_admin'] ?? false) === true;
+    if (($_SESSION['perro_admin'] ?? false) !== true) return false;
+    if (($_SESSION['admin_last_seen'] ?? 0) < time() - 1800
+        || ($_SESSION['admin_started'] ?? 0) < time() - 28800
+        || !hash_equals(admin_credential_version(), (string) ($_SESSION['admin_version'] ?? ''))) {
+        unset($_SESSION['perro_admin']);
+        return false;
+    }
+    $_SESSION['admin_last_seen'] = time();
+    return true;
+}
+
+function admin_credential_version(): string
+{
+    global $config;
+    $settings = find_record('settings', 'admin');
+    return hash('sha256', (string) ($settings['password_hash'] ?? $config['admin_password_sha256']));
 }
 
 function require_admin(): void
@@ -139,14 +160,24 @@ function require_admin(): void
 function verify_admin_login(string $username, string $password): bool
 {
     global $config;
-    $lastAttempt = (int) ($_SESSION['login_last_attempt'] ?? 0);
-    if ($lastAttempt > time() - 2) {
-        return false;
-    }
-    $_SESSION['login_last_attempt'] = time();
-    $userOk = hash_equals((string) $config['admin_username'], $username);
-    $passwordOk = verify_admin_password($password);
-    return $userOk && $passwordOk;
+    return with_data_lock(static function () use ($config, $username, $password): bool {
+        $file = PERRO_DATA . '/login-attempts.json';
+        $buckets = is_file($file) ? json_decode((string) @file_get_contents($file), true) : [];
+        if (!is_array($buckets)) throw new RuntimeException('No se puede leer el control de acceso.');
+        $buckets = array_filter($buckets, static fn(array $b): bool => ($b['started'] ?? 0) > time() - 900);
+        // Use the server-observed address, never an untrusted forwarded header.
+        $key = hash_hmac('sha256', (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'), admin_credential_version());
+        $bucket = $buckets[$key] ?? ['started' => time(), 'count' => 0];
+        if ($bucket['count'] >= 10) return false;
+        $bucket['count']++;
+        $ok = hash_equals((string) $config['admin_username'], $username) && verify_admin_password($password);
+        if ($ok) unset($buckets[$key]); else $buckets[$key] = $bucket;
+        if (count($buckets) > 2000) $buckets = array_slice($buckets, -2000, null, true);
+        if (@file_put_contents($file, json_encode($buckets), LOCK_EX) === false) {
+            throw new RuntimeException('No se pudo guardar el control de acceso.');
+        }
+        return $ok;
+    });
 }
 
 function verify_admin_password(string $password): bool
@@ -190,3 +221,25 @@ function method_is_post(): bool
 {
     return strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST';
 }
+
+function ini_bytes(string $value): int
+{
+    $number = (int) $value;
+    return match (strtolower(substr(trim($value), -1))) {
+        'g' => $number * 1024 * 1024 * 1024,
+        'm' => $number * 1024 * 1024,
+        'k' => $number * 1024,
+        default => $number,
+    };
+}
+
+set_exception_handler(static function (Throwable $error): void {
+    $GLOBALS['perro_storage_error'] = true;
+    error_log('Perro storage/request failure: ' . get_class($error));
+    http_response_code(503);
+    if (function_exists('render_error_page')) {
+        render_error_page('No pudimos completar la operación', 'No podemos confirmar el guardado. Guardá tu referencia y avisale al equipo. Intentá nuevamente cuando se revise el almacenamiento.', 503);
+    } else {
+        echo 'Servicio temporalmente no disponible.';
+    }
+});

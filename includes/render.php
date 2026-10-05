@@ -1,0 +1,181 @@
+<?php
+
+declare(strict_types=1);
+
+function page_meta(string $title, string $description, string $path = '', bool $indexable = true, ?string $image = null): array
+{
+    $robots = $indexable ? 'index,follow' : 'noindex,nofollow';
+    return [
+        'title' => $title,
+        'description' => $description,
+        'canonical' => app_url($path),
+        'robots' => $robots,
+        'image' => $image ?: app_url('assets/images/hero-perro.webp'),
+    ];
+}
+
+function project_whatsapp_message(): string
+{
+    $path = request_path();
+    if (preg_match('#^perro/([a-z0-9-]+)$#', $path, $matches) && function_exists('public_dog_by_slug')) {
+        $dog = public_dog_by_slug($matches[1]);
+        if ($dog) {
+            return 'Hola, vi la ficha de ' . $dog['name'] . ' en Perro.com.py y quisiera consultar sobre su adopción responsable.';
+        }
+    }
+
+    return match ($path) {
+        '', 'perros' => 'Hola, vi Perro.com.py y quisiera consultar sobre perros en adopción en Paraguay.',
+        'cachorros-en-adopcion' => 'Hola, vi la página de cachorros en adopción de Perro.com.py y quisiera hacer una consulta.',
+        'perros-de-raza-en-adopcion' => 'Hola, vi la página de perros de raza en adopción de Perro.com.py y quisiera hacer una consulta.',
+        'dar-perro-en-adopcion' => 'Hola, vi Perro.com.py y necesito ayuda para publicar responsablemente un perro en adopción.',
+        'perros-perdidos-paraguay' => 'Hola, vi la página de perros perdidos de Perro.com.py y quisiera consultar por un aviso.',
+        'centros-de-adopcion' => 'Hola, vi el directorio de Perro.com.py y quisiera consultar sobre una organización o grupo de rescate.',
+        'seguridad' => 'Hola, leí la guía de adopción segura de Perro.com.py y quisiera hacer una consulta.',
+        'como-funciona' => 'Hola, vi cómo funciona Perro.com.py y quisiera hacer una consulta.',
+        'privacidad' => 'Hola, quisiera solicitar información, corrección o retiro de datos publicados en Perro.com.py.',
+        'terminos' => 'Hola, leí los términos de Perro.com.py y quisiera hacer una consulta.',
+        default => 'Hola, vi Perro.com.py y quisiera hacer una consulta sobre adopción responsable.',
+    };
+}
+
+function project_whatsapp_url(?string $message = null): string
+{
+    global $config;
+    $number = preg_replace('/\D+/', '', (string) ($config['contact_whatsapp'] ?? '')) ?: '';
+    if ($number === '') {
+        return '';
+    }
+    return 'https://wa.me/' . $number . '?text=' . rawurlencode($message ?: project_whatsapp_message());
+}
+
+function render_header(array $meta): void
+{
+    global $config;
+    $flash = take_flash();
+    $whatsappUrl = project_whatsapp_url();
+    $isAdminPage = request_path() === 'admin' || str_starts_with(request_path(), 'admin/');
+    ?><!doctype html>
+<html lang="es-PY">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title><?= h($meta['title']) ?></title>
+    <meta name="description" content="<?= h($meta['description']) ?>">
+    <meta name="robots" content="<?= h($meta['robots']) ?>">
+    <link rel="canonical" href="<?= h($meta['canonical']) ?>">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="es_PY">
+    <meta property="og:title" content="<?= h($meta['title']) ?>">
+    <meta property="og:description" content="<?= h($meta['description']) ?>">
+    <meta property="og:url" content="<?= h($meta['canonical']) ?>">
+    <meta property="og:image" content="<?= h($meta['image']) ?>">
+    <meta name="theme-color" content="#17233b">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/assets/css/site.css?v=2">
+</head>
+<body class="<?= $isAdminPage ? 'admin-page' : 'public-page' ?>">
+<a class="skip-link" href="#contenido">Saltar al contenido</a>
+<header class="site-header">
+    <div class="shell header-inner">
+        <a class="brand" href="/" aria-label="Perro, inicio">
+            <span class="brand-mark" aria-hidden="true">P</span>
+            <span>Perro<span class="brand-dot">.</span></span>
+        </a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav"><span></span><span></span><span></span><span class="sr-only">Abrir menú</span></button>
+        <nav id="site-nav" class="site-nav" aria-label="Navegación principal">
+            <a href="/perros">Perros en adopción</a>
+            <a href="/perros-perdidos-paraguay">Perdidos</a>
+            <a href="/como-funciona">Cómo funciona</a>
+            <?php if (!$isAdminPage && $whatsappUrl): ?><a class="nav-whatsapp" href="<?= h($whatsappUrl) ?>" target="_blank" rel="noopener noreferrer">WhatsApp</a><?php endif; ?>
+            <a class="button button-small button-coral" href="/dar-perro-en-adopcion">Publicá un perro</a>
+        </nav>
+    </div>
+</header>
+<?php if ($flash): ?><div class="shell flash flash-<?= h($flash['type']) ?>" role="status"><?= h($flash['message']) ?></div><?php endif; ?>
+<main id="contenido">
+<?php
+}
+
+function render_footer(): void
+{
+    global $config;
+    $whatsappUrl = project_whatsapp_url();
+    $isAdminPage = request_path() === 'admin' || str_starts_with(request_path(), 'admin/');
+    ?>
+</main>
+<footer class="site-footer">
+    <div class="shell footer-grid">
+        <div>
+            <a class="brand brand-footer" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>Perro<span class="brand-dot">.</span></span></a>
+            <p>Una plataforma independiente de difusión para adopciones responsables de perros en Paraguay.</p>
+        </div>
+        <div>
+            <h2>Explorá</h2>
+            <a href="/perros">Perros en adopción</a>
+            <a href="/dar-perro-en-adopcion">Dar un perro en adopción</a>
+            <a href="/centros-de-adopcion">Centros y organizaciones</a>
+        </div>
+        <div>
+            <h2>Información</h2>
+            <a href="/seguridad">Adopción segura</a>
+            <a href="/terminos">Términos</a>
+            <a href="/privacidad">Privacidad</a>
+            <?php if ($whatsappUrl): ?><a href="<?= h($whatsappUrl) ?>" target="_blank" rel="noopener noreferrer">WhatsApp: +595 992 279 599</a><?php endif; ?>
+            <a href="/admin">Administración</a>
+        </div>
+    </div>
+    <div class="shell footer-bottom">
+        <p>Perro es una plataforma independiente de difusión. No somos un refugio ni tenemos custodia de los animales publicados. Verificá la información y conocé al perro de forma segura antes de adoptar.</p>
+        <p>© <?= date('Y') ?> Perro · Hecho con cariño en Paraguay.</p>
+    </div>
+</footer>
+<?php if (!$isAdminPage && $whatsappUrl): ?>
+<a class="whatsapp-float" href="<?= h($whatsappUrl) ?>" target="_blank" rel="noopener noreferrer" aria-label="Escribinos por WhatsApp al +595 992 279 599">
+    <span class="whatsapp-float-icon" aria-hidden="true">WA</span>
+    <strong>WhatsApp</strong>
+</a>
+<?php endif; ?>
+<script src="/assets/js/site.js?v=2" defer></script>
+</body>
+</html><?php
+}
+
+function render_error_page(string $title, string $message, int $status = 400): void
+{
+    http_response_code($status);
+    render_header(page_meta($title . ' | Perro', $message, request_path(), false));
+    ?><section class="section"><div class="shell narrow empty-state"><span class="eyebrow">Algo no salió como esperábamos</span><h1><?= h($title) ?></h1><p><?= h($message) ?></p><a class="button" href="/">Volver al inicio</a></div></section><?php
+    render_footer();
+}
+
+function dog_card(array $dog): void
+{
+    $photo = $dog['photos'][0] ?? '';
+    $statusLabel = match ($dog['adoption_status'] ?? 'available') {
+        'reserved' => 'Reservado',
+        'adopted' => 'Adoptado',
+        'reunited' => 'Reencontrado',
+        default => (($dog['listing_type'] ?? 'adoption') === 'lost' ? 'Perdido' : (($dog['listing_type'] ?? '') === 'found' ? 'Encontrado' : 'En adopción')),
+    };
+    ?>
+<article class="dog-card">
+    <a class="dog-photo" href="/perro/<?= h($dog['slug']) ?>">
+        <?php if ($photo): ?><img src="/media/<?= h($dog['id']) ?>/<?= h($photo) ?>" alt="<?= h($dog['name']) ?>, perro publicado en <?= h($dog['city']) ?>" loading="lazy"><?php else: ?><span class="photo-placeholder">Foto en revisión</span><?php endif; ?>
+        <span class="status-tag"><?= h($statusLabel) ?></span>
+    </a>
+    <div class="dog-body">
+        <div class="dog-heading"><h2><a href="/perro/<?= h($dog['slug']) ?>"><?= h($dog['name']) ?></a></h2><span><?= h($dog['city']) ?></span></div>
+        <p class="dog-meta"><?= h($dog['age_group']) ?> · <?= h($dog['sex']) ?> · <?= h($dog['size']) ?></p>
+        <p><?= h($dog['breed_label'] ?: 'Mestizo') ?></p>
+        <a class="text-link" href="/perro/<?= h($dog['slug']) ?>">Conocé su historia <span aria-hidden="true">→</span></a>
+    </div>
+</article><?php
+}
+
+function select_options(array $options, string $selected = ''): void
+{
+    foreach ($options as $value => $label) {
+        ?><option value="<?= h((string) $value) ?>"<?= (string) $value === $selected ? ' selected' : '' ?>><?= h((string) $label) ?></option><?php
+    }
+}

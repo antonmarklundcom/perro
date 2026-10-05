@@ -5,6 +5,7 @@ declare(strict_types=1);
 require __DIR__ . '/includes/bootstrap.php';
 require __DIR__ . '/includes/data.php';
 require __DIR__ . '/includes/render.php';
+require __DIR__ . '/includes/legal.php';
 
 $path = request_path();
 
@@ -32,7 +33,9 @@ if ($path === 'sitemap.xml') {
 if (preg_match('#^media/([a-z0-9-]+)/([a-z0-9._-]+)$#i', $path, $matches)) {
     $dog = find_record('dogs', $matches[1]);
     $filename = basename($matches[2]);
-    if (!$dog || ($dog['status'] ?? '') !== 'published' || !in_array($filename, $dog['photos'] ?? [], true)) {
+    if (!$dog || ($dog['status'] ?? '') !== 'published'
+        || (!empty($dog['expires_at']) && strtotime((string) $dog['expires_at']) < time())
+        || !in_array($filename, $dog['photos'] ?? [], true)) {
         http_response_code(404);
         exit;
     }
@@ -43,7 +46,7 @@ if (preg_match('#^media/([a-z0-9-]+)/([a-z0-9._-]+)$#i', $path, $matches)) {
         exit;
     }
     header('Content-Type: ' . $details['mime']);
-    header('Cache-Control: public, max-age=604800, immutable');
+    header('Cache-Control: no-store');
     header('Content-Length: ' . filesize($file));
     readfile($file);
     exit;
@@ -75,11 +78,25 @@ if ($path === 'enviar-perro' && method_is_post()) {
     if ($whatsapp === '') {
         $errors[] = 'Ingresá un WhatsApp paraguayo válido.';
     }
-    if (!isset($_POST['adult_confirm'], $_POST['authorized_confirm'], $_POST['photo_consent'], $_POST['terms_accept'])) {
-        $errors[] = 'Necesitamos todas las confirmaciones obligatorias.';
+    foreach (['adult_confirm', 'authorized_confirm', 'photo_consent', 'terms_accept', 'no_sale_confirm'] as $confirmation) {
+        if (!checked($confirmation)) {
+            $errors[] = 'Necesitamos todas las confirmaciones obligatorias.';
+            break;
+        }
+    }
+    if (text('terms_version') !== PERRO_TERMS_VERSION || text('privacy_version') !== PERRO_PRIVACY_VERSION) {
+        $errors[] = 'Las reglas se actualizaron. Revisá los textos y confirmá nuevamente antes de enviar.';
+    }
+    $publicName = text('name_visibility') === 'public';
+    $publicDisplayName = $publicName ? text('public_display_name', 80) : '';
+    if ($publicName && $publicDisplayName === '') {
+        $errors[] = 'Escribí el nombre o alias que autorizás mostrar, o elegí no mostrar tu nombre.';
+    }
+    if (!in_array(text('name_visibility'), ['', 'private', 'public'], true)) {
+        $errors[] = 'Elegí una opción válida para la privacidad de tu nombre.';
     }
     if ($errors) {
-        $_SESSION['old'] = $_POST;
+        $_SESSION['old'] = array_filter($_POST, 'is_string');
         set_flash('error', implode(' ', array_unique($errors)));
         redirect('dar-perro-en-adopcion');
     }
@@ -93,7 +110,20 @@ if ($path === 'enviar-perro' && method_is_post()) {
         'email' => $email,
         'whatsapp' => $whatsapp,
         'relationship' => text('relationship', 60),
-        'public_whatsapp' => isset($_POST['public_whatsapp']),
+        'public_name' => $publicName,
+        'public_display_name' => $publicDisplayName,
+        'public_whatsapp' => checked('public_whatsapp'),
+        'consents' => [
+            'adult_confirm' => true,
+            'authorized_confirm' => true,
+            'photo_consent' => true,
+            'no_sale_confirm' => true,
+            'terms_version' => PERRO_TERMS_VERSION,
+            'privacy_version' => PERRO_PRIVACY_VERSION,
+            'accepted_at' => now_iso(),
+            'public_name' => $publicName,
+            'public_whatsapp' => checked('public_whatsapp'),
+        ],
         'name' => text('name', 80),
         'department' => text('department', 80),
         'city' => text('city', 100),
@@ -227,7 +257,8 @@ if ($path === 'admin/action' && method_is_post()) {
             'photos' => $record['photos'],
             'adoption_status' => 'available',
             'status' => 'published',
-            'contact_name' => $record['submitter_name'],
+            'public_name' => ($record['public_name'] ?? false) === true,
+            'contact_name' => ($record['public_name'] ?? false) === true ? ($record['public_display_name'] ?? '') : '',
             'contact_whatsapp' => $record['public_whatsapp'] ? $record['whatsapp'] : '',
             'published_at' => now_iso(),
             'last_confirmed_at' => now_iso(),
@@ -311,7 +342,7 @@ if ($path === '') {
         </div>
     </section>
     <section class="quick-search" aria-labelledby="buscar-titulo"><div class="shell search-panel"><div><span class="eyebrow">Encontrá a tu compañero</span><h2 id="buscar-titulo">Buscá por ciudad, edad o tamaño</h2></div><form action="/perros" method="get"><label><span>Ciudad</span><input name="city" placeholder="Ej. Asunción"></label><label><span>Edad</span><select name="age"><option value="">Todas</option><option>Cachorro</option><option>Joven</option><option>Adulto</option><option>Senior</option></select></label><button class="button" type="submit">Buscar perros</button></form></div></section>
-    <section class="section"><div class="shell"><div class="section-head"><div><span class="eyebrow">Fichas verificadas</span><h2>Perros que buscan hogar</h2></div><a class="text-link" href="/perros">Ver todos <span aria-hidden="true">→</span></a></div>
+    <section class="section"><div class="shell"><div class="section-head"><div><span class="eyebrow">Fichas revisadas</span><h2>Perros que buscan hogar</h2></div><a class="text-link" href="/perros">Ver todos <span aria-hidden="true">→</span></a></div>
         <?php if ($dogs): ?><div class="dog-grid"><?php foreach ($dogs as $dog) dog_card($dog); ?></div><?php else: ?><div class="empty-state"><span class="empty-mark">P</span><h3>Las primeras historias todavía están por llegar</h3><p>No inventamos perros para llenar la página. Cuando aprobemos fichas reales, van a aparecer acá.</p><a class="button button-coral" href="/dar-perro-en-adopcion">Enviar la primera ficha</a></div><?php endif; ?>
     </div></section>
     <section class="section section-blue"><div class="shell"><div class="section-head"><div><span class="eyebrow">Simple y cuidado</span><h2>Cómo funciona</h2></div></div><div class="steps"><article><span>1</span><h3>Enviás la ficha</h3><p>Contanos quién es el perro, dónde está y cómo pueden contactarte.</p></article><article><span>2</span><h3>La revisamos</h3><p>Una persona administradora verifica que esté completa y no sea una venta.</p></article><article><span>3</span><h3>Conectan con cuidado</h3><p>La persona interesada habla con el responsable y acuerdan un encuentro seguro.</p></article></div></div></section>
@@ -354,6 +385,10 @@ if (preg_match('#^perro/([a-z0-9-]+)$#', $path, $matches)) {
     }
     $image = !empty($dog['photos'][0]) ? app_url('media/' . $dog['id'] . '/' . $dog['photos'][0]) : null;
     render_header(page_meta($dog['name'] . ', perro en adopción en ' . $dog['city'] . ' | Perro', 'Conocé la historia de ' . $dog['name'] . ' y consultá por su adopción responsable.', 'perro/' . $dog['slug'], true, $image));
+    // Legacy records may contain a private submitter name: only display explicit consent.
+    if (($dog['public_name'] ?? false) === true && !empty($dog['contact_name'])) {
+        ?><div class="shell"><p>Nombre público del responsable: <?= h($dog['contact_name']) ?></p></div><?php
+    }
     ?><section class="section dog-detail"><div class="shell dog-detail-grid"><div class="dog-gallery"><?php if (!empty($dog['photos'])): foreach ($dog['photos'] as $index => $photo): ?><img src="/media/<?= h($dog['id']) ?>/<?= h($photo) ?>" alt="<?= h($dog['name']) ?><?= $index ? ', otra vista' : '' ?>"<?= $index ? ' loading="lazy"' : '' ?>><?php endforeach; else: ?><div class="photo-placeholder large">Foto no disponible</div><?php endif; ?></div><article class="dog-profile"><span class="eyebrow"><?= h($dog['city']) ?> · <?= h($dog['department']) ?></span><h1><?= h($dog['name']) ?></h1><p class="profile-lead"><?= h($dog['description']) ?></p><dl class="facts"><div><dt>Edad</dt><dd><?= h($dog['approximate_age'] ?: $dog['age_group']) ?></dd></div><div><dt>Sexo</dt><dd><?= h($dog['sex']) ?></dd></div><div><dt>Tamaño</dt><dd><?= h($dog['size']) ?></dd></div><div><dt>Raza</dt><dd><?= h($dog['breed_label'] ?: 'Mestizo') ?></dd></div><div><dt>Vacunas</dt><dd><?= h($dog['vaccination_status'] ?: 'No informado') ?></dd></div><div><dt>Esterilización</dt><dd><?= h($dog['sterilization_status'] ?: 'No informado') ?></dd></div></dl>
     <?php if ($dog['compatibility']): ?><h2>Compatibilidad conocida</h2><p><?= nl2br(h($dog['compatibility'])) ?></p><?php endif; ?><?php if ($dog['health_information']): ?><h2>Información de salud</h2><p><?= nl2br(h($dog['health_information'])) ?></p><small>Información declarada por la persona responsable; verificá con un profesional veterinario.</small><?php endif; ?><?php if ($dog['adoption_requirements']): ?><h2>Lo que busca su responsable</h2><p><?= nl2br(h($dog['adoption_requirements'])) ?></p><?php endif; ?>
     <div class="profile-actions"><?php if (!empty($dog['contact_whatsapp'])): $msg = rawurlencode('Hola, vi a ' . $dog['name'] . ' en Perro y quisiera conocer más sobre su adopción responsable.'); ?><a class="button button-whatsapp" href="https://wa.me/<?= h($dog['contact_whatsapp']) ?>?text=<?= h($msg) ?>" rel="noopener noreferrer">Consultar por WhatsApp</a><?php else: ?><div class="notice">El contacto público no fue autorizado. La administración puede ayudar a verificar la ficha.</div><?php endif; ?></div><p class="date-note">Publicada el <?= h(date('d/m/Y', strtotime($dog['published_at']))) ?> · Última confirmación <?= h(date('d/m/Y', strtotime($dog['last_confirmed_at']))) ?></p></article></div></section>
@@ -369,8 +404,28 @@ if ($path === 'dar-perro-en-adopcion') {
     <section class="section"><div class="shell form-layout"><aside class="form-aside"><h2>Antes de empezar</h2><ul class="check-list"><li>Debés tener 18 años o más.</li><li>Necesitás autorización para publicar al perro.</li><li>Contá lo que sabés con honestidad.</li><li>La adopción debe ser gratuita.</li><li>Las fotos deben ser tuyas o tener permiso.</li></ul><div class="notice">Los datos de contacto permanecen privados salvo que autorices mostrar tu WhatsApp.</div></aside><form class="submission-form" method="post" action="/enviar-perro" enctype="multipart/form-data"><?= csrf_field() ?><input type="hidden" name="form_started" value="<?= time() ?>"><div class="honeypot" aria-hidden="true"><label>Sitio web<input name="website" tabindex="-1" autocomplete="off"></label></div>
     <fieldset><legend>1. Sobre la publicación</legend><div class="field-grid"><label>Tipo de aviso<select name="listing_type" required><option value="adoption">Adopción</option><option value="lost">Perro perdido</option><option value="found">Perro encontrado</option></select></label><label>Tu relación con el perro<select name="relationship" required><option value="">Seleccioná</option><option>Responsable actual</option><option>Hogar temporal</option><option>Rescatista independiente</option><option>Organización</option><option>Otra</option></select></label></div></fieldset>
     <fieldset><legend>2. Datos del perro</legend><div class="field-grid"><label>Nombre del perro<input name="name" required maxlength="80" value="<?= h($old['name'] ?? '') ?>"></label><label>Departamento<input name="department" required maxlength="80" placeholder="Ej. Central" value="<?= h($old['department'] ?? '') ?>"></label><label>Ciudad<input name="city" required maxlength="100" placeholder="Ej. Luque" value="<?= h($old['city'] ?? '') ?>"></label><label>Edad aproximada<input name="approximate_age" maxlength="60" placeholder="Ej. 2 años"></label><label>Etapa<select name="age_group" required><option value="">Seleccioná</option><option>Cachorro</option><option>Joven</option><option>Adulto</option><option>Senior</option></select></label><label>Sexo<select name="sex" required><option value="">Seleccioná</option><option>Hembra</option><option>Macho</option><option>No se sabe</option></select></label><label>Tamaño<select name="size" required><option value="">Seleccioná</option><option>Pequeño</option><option>Mediano</option><option>Grande</option></select></label><label>Raza o apariencia<input name="breed_label" maxlength="100" placeholder="Ej. mestizo tipo labrador"></label></div><label class="check"><input type="checkbox" name="mixed_breed" value="1"> Es mestizo o la raza es aproximada</label><label>Historia y personalidad<textarea name="description" required minlength="40" maxlength="3000" placeholder="Contá cómo es, qué rutina tiene y qué hogar podría acompañarlo mejor."><?= h($old['description'] ?? '') ?></textarea></label><div class="field-grid"><label>Vacunas<select name="vaccination_status"><option>No informado</option><option>Al día</option><option>Parcial</option><option>Sin vacunas</option></select></label><label>Esterilización<select name="sterilization_status"><option>No informado</option><option>Esterilizado</option><option>No esterilizado</option></select></label></div><label>Información de salud<textarea name="health_information" maxlength="1200"></textarea></label><label>Compatibilidad conocida<textarea name="compatibility" maxlength="800" placeholder="Niños, perros, gatos, vida en departamento..."></textarea></label><label>Motivo y contexto<textarea name="reason" maxlength="1000"></textarea></label><label>Requisitos para adoptar<textarea name="adoption_requirements" maxlength="1200"></textarea></label><div class="field-grid"><label>Último lugar visto o encontrado<input name="last_location" maxlength="180"></label><label>Fecha del hecho<input type="date" name="incident_date"></label></div></fieldset>
-    <fieldset><legend>3. Fotos</legend><?php if (function_exists('imagecreatefromstring')): ?><label>Hasta cinco fotos<input type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple><span class="field-help">JPG, PNG o WebP. Máximo 5 MB por foto. El servidor crea una copia limpia y optimizada, sin los metadatos del archivo original.</span></label><?php else: ?><div class="notice">La extensión de imágenes del servidor todavía no está activa. Podés enviar la ficha sin fotos y agregarlas cuando Hostinger habilite GD.</div><?php endif; ?><label class="check"><input type="checkbox" name="photo_consent" required> Tengo permiso para publicar estas fotos.</label></fieldset>
-    <fieldset><legend>4. Tu contacto privado</legend><div class="field-grid"><label>Nombre completo<input name="submitter_name" required maxlength="120" value="<?= h($old['submitter_name'] ?? '') ?>"></label><label>Correo electrónico<input type="email" name="email" required maxlength="180" value="<?= h($old['email'] ?? '') ?>"></label><label>WhatsApp<input type="tel" name="whatsapp" required maxlength="40" placeholder="0981 000 000" value="<?= h($old['whatsapp'] ?? '') ?>"></label></div><label class="check"><input type="checkbox" name="public_whatsapp"> Autorizo mostrar mi WhatsApp en la ficha pública.</label><label class="check"><input type="checkbox" name="adult_confirm" required> Confirmo que tengo 18 años o más.</label><label class="check"><input type="checkbox" name="authorized_confirm" required> Confirmo que tengo autorización para publicar al perro.</label><label class="check"><input type="checkbox" name="terms_accept" required> Acepto los <a href="/terminos" target="_blank">términos</a> y la <a href="/privacidad" target="_blank">política de privacidad</a>.</label></fieldset><button class="button button-coral button-full" type="submit">Enviar ficha para revisión</button></form></div></section>
+    <fieldset><legend>3. Fotos</legend><?php if (function_exists('imagecreatefromstring')): ?><label>Hasta cinco fotos<input type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple><span class="field-help">JPG, PNG o WebP. Máximo 5 MB por foto. El servidor crea una copia limpia y optimizada, sin los metadatos del archivo original. No incluyas documentos, domicilios ni datos personales en la imagen.</span></label><?php else: ?><div class="notice">La extensión de imágenes del servidor todavía no está activa. Podés enviar la ficha sin fotos.</div><?php endif; ?><label class="check"><input type="checkbox" name="photo_consent" value="1" required> Tengo permiso para publicar las fotos que envío.</label></fieldset>
+    <fieldset><legend>4. Tu contacto privado</legend>
+        <p>La administración usa estos datos para revisar el aviso y contactarte. Tu nombre y tu WhatsApp no se muestran por defecto. Tu correo permanece privado.</p>
+        <div class="field-grid">
+            <label>Nombre completo (solo administración)<input name="submitter_name" required maxlength="120" autocomplete="name" value="<?= h($old['submitter_name'] ?? '') ?>"></label>
+            <label>Correo electrónico (privado)<input type="email" name="email" required maxlength="180" autocomplete="email" value="<?= h($old['email'] ?? '') ?>"></label>
+            <label>WhatsApp (privado)<input type="tel" name="whatsapp" required maxlength="40" autocomplete="tel" placeholder="0981 000 000" value="<?= h($old['whatsapp'] ?? '') ?>"></label>
+        </div>
+        <fieldset><legend>Privacidad de tu nombre</legend>
+            <label class="check"><input type="radio" name="name_visibility" value="private" <?= ($old['name_visibility'] ?? 'private') !== 'public' ? 'checked' : '' ?>> No mostrar mi nombre</label>
+            <label class="check"><input type="radio" name="name_visibility" value="public" <?= ($old['name_visibility'] ?? '') === 'public' ? 'checked' : '' ?>> Autorizo mostrar el nombre o alias público que escribo abajo</label>
+            <label>Nombre o alias público (opcional)<input name="public_display_name" maxlength="80" autocomplete="off" value="<?= h($old['public_display_name'] ?? '') ?>"><span class="field-help">Solo se publica si elegís mostrarlo. No copiamos automáticamente tu nombre completo.</span></label>
+        </fieldset>
+        <label class="check"><input type="checkbox" name="public_whatsapp" value="1" <?= ($old['public_whatsapp'] ?? '') === '1' ? 'checked' : '' ?>> Autorizo mostrar mi WhatsApp en la ficha pública (opcional).</label>
+        <p>Si mantenés tu contacto privado, las personas interesadas pueden consultar al equipo de Perro. No incluyas teléfonos, direcciones exactas ni datos de otras personas en la descripción o las fotos.</p>
+        <input type="hidden" name="terms_version" value="<?= PERRO_TERMS_VERSION ?>">
+        <input type="hidden" name="privacy_version" value="<?= PERRO_PRIVACY_VERSION ?>">
+        <label class="check"><input type="checkbox" name="adult_confirm" value="1" required> Confirmo que tengo 18 años o más.</label>
+        <label class="check"><input type="checkbox" name="authorized_confirm" value="1" required> Confirmo que soy responsable o tengo autorización para difundir este aviso.</label>
+        <label class="check"><input type="checkbox" name="no_sale_confirm" value="1" required> Este aviso no es una venta ni una oferta de cría. No voy a pedir señas, pagos ni donaciones obligatorias para entregar el perro.</label>
+        <label class="check"><input type="checkbox" name="terms_accept" value="1" required> Leí y acepto los <a href="/terminos" target="_blank" rel="noopener noreferrer">términos</a> y leí la <a href="/privacidad" target="_blank" rel="noopener noreferrer">política de privacidad</a>. Los permisos opcionales se eligen por separado.</label>
+    </fieldset><button class="button button-coral button-full" type="submit">Enviar ficha para revisión</button></form></div></section>
     <?php render_footer(); exit;
 }
 
@@ -392,10 +447,10 @@ if ($path === 'perros-perdidos-paraguay') {
 $contentPages = [
     'como-funciona' => ['Cómo funciona Perro', 'Una ficha pasa por revisión antes de publicarse.', '<h2>Publicar, revisar y conectar</h2><p>La persona responsable completa una ficha. La administración revisa que tenga información suficiente, que no sea una venta y que las fotos tengan autorización. Solo entonces puede aparecer públicamente.</p><h2>Perro no decide la adopción</h2><p>La conversación, el encuentro y la decisión final ocurren entre la persona responsable y quien quiere adoptar. Ambas partes deben hacer preguntas, verificar la información y priorizar el bienestar del animal.</p>'],
     'seguridad' => ['Adopción segura', 'Consejos para conocer al perro y evitar engaños.', '<h2>Antes del encuentro</h2><ul><li>Pedí información sobre salud, rutina, carácter y motivo de adopción.</li><li>No envíes dinero para reservar un perro.</li><li>Desconfiá de urgencias artificiales o historias que no se pueden verificar.</li></ul><h2>Durante el encuentro</h2><ul><li>Elegí un lugar seguro y, si podés, andá acompañado.</li><li>Observá al perro con calma y respetá sus tiempos.</li><li>Si hay otros animales en casa, planificá una presentación gradual.</li></ul><h2>Después</h2><p>Coordiná una revisión veterinaria, prepará un espacio tranquilo y mantené una rutina estable durante la adaptación.</p>'],
-    'privacidad' => ['Privacidad', 'Qué datos recibe Perro y para qué se usan.', '<p><strong>Texto pendiente de revisión legal antes del lanzamiento público.</strong></p><h2>Datos que recibimos</h2><p>Cuando enviás una ficha podemos recibir tu nombre, correo, WhatsApp, relación con el perro, información del animal y fotografías.</p><h2>Para qué los usamos</h2><p>Los usamos para revisar la publicación, contactarte sobre ella, prevenir abusos y mantener un historial de moderación. Tu correo y WhatsApp permanecen privados salvo autorización expresa para mostrar el WhatsApp.</p><h2>Conservación y solicitudes</h2><p>Guardamos la información mientras sea necesaria para administrar la ficha y resolver reportes. Podés pedir información, corrección o retiro por WhatsApp al <a href="' . h(project_whatsapp_url('Hola, quisiera solicitar información, corrección o retiro de datos publicados en Perro.com.py.')) . '" target="_blank" rel="noopener noreferrer">+595 992 279 599</a>.</p>'],
-    'terminos' => ['Términos de uso', 'Reglas básicas para publicar y adoptar responsablemente.', '<p><strong>Texto pendiente de revisión legal antes del lanzamiento público.</strong></p><h2>Rol de la plataforma</h2><p>Perro es una plataforma independiente de difusión. No tiene custodia de los animales, no garantiza la información aportada y no participa en la decisión final de adopción.</p><h2>Reglas de publicación</h2><ul><li>Debés tener 18 años y autorización para publicar.</li><li>La información debe ser honesta y las fotos deben contar con permiso.</li><li>No se permiten ventas, criaderos, cobros disfrazados ni contenido abusivo.</li><li>Perro puede editar, rechazar, retirar o conservar un registro interno de moderación.</li></ul><h2>Verificación</h2><p>Quien adopta debe verificar salud, carácter, identidad de la persona responsable y condiciones de entrega. Perro no garantiza raza, salud, temperamento, disponibilidad ni éxito de una adopción.</p>'],
     'centros-de-adopcion' => ['Centros de adopción y organizaciones', 'Directorio futuro de organizaciones verificadas en Paraguay.', '<div class="empty-state"><span class="empty-mark">+</span><h2>Todavía no publicamos organizaciones</h2><p>No vamos a inventar alianzas ni datos. Si representás a una organización o grupo de rescate en Paraguay, más adelante vas a poder solicitar una revisión para aparecer acá.</p></div>'],
 ];
+
+$contentPages = array_replace($contentPages, legal_pages());
 
 if (isset($contentPages[$path])) {
     [$title, $description, $html] = $contentPages[$path];
@@ -431,6 +486,8 @@ if ($path === 'admin') {
                 <h3><?= h($submission['name']) ?></h3>
                 <p><?= h($submission['city']) ?> · <?= h($submission['listing_type']) ?> · <?= h($submission['reference']) ?></p>
                 <p class="admin-private"><strong>Contacto privado:</strong> <?= h($submission['submitter_name']) ?> · <?= h($submission['email']) ?> · <?= h($submission['whatsapp']) ?></p>
+                <p><strong>Permisos públicos:</strong> nombre <?= ($submission['public_name'] ?? false) === true ? h($submission['public_display_name'] ?? '') : 'privado' ?> · WhatsApp <?= !empty($submission['public_whatsapp']) ? 'autorizado' : 'privado' ?>.</p>
+                <p><small>Reglas aceptadas: <?= h($submission['consents']['terms_version'] ?? 'envío anterior, sin versión registrada') ?> · <?= h($submission['consents']['accepted_at'] ?? '') ?></small></p>
                 <details><summary>Ver ficha completa</summary><p><?= nl2br(h($submission['description'])) ?></p><dl class="facts compact"><div><dt>Edad</dt><dd><?= h($submission['age_group']) ?></dd></div><div><dt>Sexo</dt><dd><?= h($submission['sex']) ?></dd></div><div><dt>Tamaño</dt><dd><?= h($submission['size']) ?></dd></div><div><dt>Fotos</dt><dd><?= count($submission['photos'] ?? []) ?></dd></div></dl></details>
             </div>
             <div class="admin-card-actions">

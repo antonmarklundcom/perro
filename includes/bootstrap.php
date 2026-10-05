@@ -48,8 +48,14 @@ function h(?string $value): string
 
 function text(string $key, int $max = 5000): string
 {
-    $value = trim((string) ($_POST[$key] ?? ''));
+    $input = $_POST[$key] ?? '';
+    $value = is_string($input) ? trim($input) : '';
     return function_exists('mb_substr') ? mb_substr($value, 0, $max) : substr($value, 0, $max);
+}
+
+function checked(string $key): bool
+{
+    return ($_POST[$key] ?? null) === '1';
 }
 
 function now_iso(): string
@@ -98,10 +104,9 @@ function csrf_field(): string
 
 function require_csrf(): void
 {
-    $provided = (string) ($_POST['csrf_token'] ?? '');
+    $provided = text('csrf_token', 100);
     if ($provided === '' || !hash_equals(csrf_token(), $provided)) {
-        http_response_code(419);
-        render_error_page('La sesión venció', 'Volvé a cargar la página e intentá nuevamente.');
+        render_error_page('La sesión venció', 'Volvé a cargar la página e intentá nuevamente.', 419);
         exit;
     }
 }

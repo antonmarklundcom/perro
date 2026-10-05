@@ -7,6 +7,7 @@ $file = __DIR__ . $path;
 $blocked = str_starts_with($path, '/storage/')
     || str_starts_with($path, '/includes/')
     || str_starts_with($path, '/tools/')
+    || preg_match('/\.md$/i', $path) === 1
     || in_array($path, ['/config.php', '/.htaccess', '/README.md', '/CONFIGURACION.md'], true);
 if ($blocked) {
     http_response_code(404);

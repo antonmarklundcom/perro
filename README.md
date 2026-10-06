@@ -8,6 +8,7 @@ Sitio ligero para difusión y moderación de adopciones de perros en Paraguay. N
 - Apache con `mod_rewrite` y soporte para `.htaccess`.
 - Permiso de escritura en `storage/data` y `storage/uploads`.
 - Extensión GD para recibir, redimensionar y limpiar fotos. GD con FreeType y las fuentes incluidas en assets/fonts permite generar las imágenes para compartir. Sin GD, las fichas de texto siguen funcionando y el formulario explica que las fotos están deshabilitadas.
+- Extensión EXIF opcional para corregir la orientación de fotos JPEG de celulares antes de quitar sus metadatos. Sin EXIF se conservan los píxeles originales y el equipo puede corregir el giro desde el panel.
 
 ## Subida a Hostinger
 
@@ -61,6 +62,14 @@ El panel móvil abre en **Pendientes** y separa revisión, avisos, reportes y co
 - Dentro de `/admin`, cada solicitud tiene un botón para escribir al remitente con el nombre del perro y la referencia ya incluidos.
 - WhatsApp no aprueba ni publica nada automáticamente: las decisiones siguen ocurriendo dentro de `/admin`.
 
+En **Fichas de perros**, el panel y el CSV conservan el nombre, correo, WhatsApp y referencia del envío original como datos privados para administración, aunque no estén autorizados para publicarse. El sitio público sigue mostrando WhatsApp únicamente con autorización. Tratá el CSV como información privada.
+
+## Girar y recortar fotos
+
+Desde **Revisar y editar**, abrí **Girar y recortar** en cada foto. Guardá primero los cambios de texto de la ficha: la foto usa un formulario separado. Podés girar 90° a izquierda/derecha y arrastrar un recorte sobre la vista previa, también desde el celular. Sin JavaScript siguen disponibles el selector de giro y las coordenadas numéricas del recorte, medidas después del giro.
+
+El recorte es definitivo. Al guardar, se crea un nuevo JPEG sin metadatos de hasta 1800 px, se actualizan el envío y su ficha pública bajo el mismo bloqueo y diario, y se elimina la versión anterior después de confirmar el cambio. Una edición desactualizada se rechaza. Sin GD se informa la limitación y se conserva la foto. Si una escritura se interrumpe después de guardar el diario, se conservan las imágenes completas necesarias para su recuperación; nunca borres el diario para ocultar un error.
+
 ## Seguridad y límites
 
 - Los archivos de datos y fotos están dentro de `storage`, bloqueado por `.htaccess`.
@@ -78,4 +87,4 @@ Descargá periódicamente la carpeta `storage`. El panel permite exportar las fi
 
 ## Prueba de desarrollo
 
-`node tools/privacy-smoke.cjs` verifica rutas y flujos con datos sintéticos en una copia temporal. Configurá `PERRO_PHP_BIN` si PHP no está en PATH. Para habilitar GD localmente en la prueba, podés configurar `PERRO_PHP_GD_DIR`. No hace falta Node en Hostinger.
+`node tools/privacy-smoke.cjs` verifica rutas y flujos con datos sintéticos en una copia temporal. Configurá `PERRO_PHP_BIN` si PHP no está en PATH. Para habilitar GD localmente en la prueba, podés configurar `PERRO_PHP_GD_DIR`; agregá `PERRO_PHP_EXIF=1` para habilitar la extensión EXIF instalada. La prueba comprueba etiquetas, CSV privado, orientación, giro, recorte y errores de guardado cuando GD está disponible, y la conservación de fotos sin GD. No hace falta Node en Hostinger.

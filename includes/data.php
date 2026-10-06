@@ -159,6 +159,47 @@ function record_moderation(string $action, string $recordId, string $note = ''):
     ]);
 }
 
+function jpeg_orientation(string $file): int
+{
+    if (!function_exists('exif_read_data')) return 1;
+    $exif = @exif_read_data($file, 'IFD0', true, false);
+    $orientation = $exif['IFD0']['Orientation'] ?? 1;
+    return is_int($orientation) && $orientation >= 1 && $orientation <= 8 ? $orientation : 1;
+}
+
+function rotate_photo_image(GdImage &$image, int $clockwise): bool
+{
+    if ($clockwise === 0) return true;
+    $rotated = @imagerotate($image, -$clockwise, imagecolorallocate($image, 255, 255, 255));
+    if ($rotated === false) return false;
+    imagedestroy($image);
+    $image = $rotated;
+    return true;
+}
+
+function orient_photo_image(GdImage &$image, int $orientation): bool
+{
+    if (in_array($orientation, [2, 5, 7], true) && !imageflip($image, IMG_FLIP_HORIZONTAL)) return false;
+    if ($orientation === 4 && !imageflip($image, IMG_FLIP_VERTICAL)) return false;
+    return rotate_photo_image($image, [3=>180, 5=>270, 6=>90, 7=>90, 8=>270][$orientation] ?? 0);
+}
+
+// Always flatten/re-encode pixels into JPEG, dropping EXIF and retaining the upload size limit.
+function write_clean_photo(GdImage $source, string $destination): bool
+{
+    $width = imagesx($source); $height = imagesy($source);
+    $scale = min(1, 1800 / max($width, $height));
+    $newWidth = max(1, (int) round($width * $scale));
+    $newHeight = max(1, (int) round($height * $scale));
+    $clean = @imagecreatetruecolor($newWidth, $newHeight);
+    if (!$clean) return false;
+    try {
+        imagefill($clean, 0, 0, imagecolorallocate($clean, 255, 255, 255));
+        return imagecopyresampled($clean, $source, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height)
+            && @imagejpeg($clean, $destination, 86) && is_file($destination) && filesize($destination) > 0;
+    } finally { imagedestroy($clean); }
+}
+
 function save_submission_images(string $submissionId, ?array &$errors = null): array
 {
     global $config;
@@ -209,17 +250,13 @@ function save_submission_images(string $submissionId, ?array &$errors = null): a
             $errors[] = 'Una foto no es una imagen válida. Seleccioná otra foto.';
             break;
         }
-        $scale = min(1, 1800 / max($width, $height));
-        $newWidth = max(1, (int) round($width * $scale));
-        $newHeight = max(1, (int) round($height * $scale));
-        $clean = imagecreatetruecolor($newWidth, $newHeight);
-        $white = imagecolorallocate($clean, 255, 255, 255);
-        imagefill($clean, 0, 0, $white);
-        imagecopyresampled($clean, $source, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
         $filename = bin2hex(random_bytes(10)) . '.jpg';
-        $written = @imagejpeg($clean, $target . '/' . $filename, 86);
-        imagedestroy($source);
-        imagedestroy($clean);
+        $destination = $target . '/' . $filename;
+        $partial = $destination . '.tmp';
+        try {
+            $oriented = $mime !== 'image/jpeg' || orient_photo_image($source, jpeg_orientation($temp));
+            $written = $oriented && write_clean_photo($source, $partial) && @rename($partial, $destination);
+        } finally { imagedestroy($source); @unlink($partial); }
         if ($written) {
             $saved[] = $filename;
         } else {

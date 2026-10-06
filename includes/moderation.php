@@ -142,8 +142,143 @@ function record_revision(array $record): string
     return hash('sha256', (string) json_encode($record));
 }
 
+function admin_photo_file(array $record, string $photo): ?array
+{
+    $folder = $record['source_submission_id'] ?? $record['id'] ?? '';
+    if (!is_string($folder) || !preg_match('/^[a-z0-9_-]+$/Di', $folder)
+        || !preg_match('/^[a-z0-9_-]+\.jpe?g$/Di', $photo)
+        || !in_array($photo, $record['photos'] ?? [], true)) return null;
+    $root = realpath(PERRO_UPLOADS);
+    $directory = realpath(PERRO_UPLOADS . '/' . $folder);
+    $file = realpath(PERRO_UPLOADS . '/' . $folder . '/' . $photo);
+    if (!$root || !$directory || !$file || dirname($directory) !== $root || dirname($file) !== $directory || !is_file($file)) return null;
+    $size = @filesize($file);
+    $details = @getimagesize($file);
+    if (!$size || $size > 16 * 1024 * 1024 || !$details || ($details['mime'] ?? '') !== 'image/jpeg'
+        || $details[0] < 1 || $details[1] < 1 || $details[0] * $details[1] > 8000000) return null;
+    return ['path'=>$file, 'directory'=>$directory, 'width'=>$details[0], 'height'=>$details[1]];
+}
+
+function photo_integer(string $key): ?int
+{
+    $value = $_POST[$key] ?? '';
+    return is_string($value) && preg_match('/^\d{1,5}$/D', $value) ? (int) $value : null;
+}
+
+function edit_admin_photo(string $dataset, string $id, string $photo): array
+{
+    return with_data_lock(static function () use ($dataset, $id, $photo): array {
+        $current = find_record($dataset, $id);
+        if (!$current || !hash_equals(record_revision($current), text('revision', 100))) return ['error', 'La ficha cambió en otra sesión. Volvé a abrir la foto antes de editar.'];
+        if (!function_exists('imagecreatefromstring')) return ['error', 'No se pueden editar fotos sin GD. Avisale al equipo para que lo habilite.'];
+        $file = admin_photo_file($current, $photo);
+        if (!$file) return ['error', 'Esta foto no es un JPEG disponible para editar. Volvé a la ficha.'];
+        $rotation = $_POST['rotation'] ?? null;
+        if (!is_string($rotation) || !in_array($rotation, ['0', '90', '180', '270'], true)) return ['error', 'Elegí un giro de 90 grados a la izquierda o a la derecha.'];
+        $crop = [];
+        foreach (['crop_x', 'crop_y', 'crop_width', 'crop_height'] as $key) {
+            if (($_POST[$key] ?? '') !== '') $crop[$key] = photo_integer($key);
+        }
+        if ($crop && (count($crop) !== 4 || in_array(null, $crop, true))) return ['error', 'Ingresá un recorte completo con coordenadas enteras.'];
+        $limit = ini_bytes((string) ini_get('memory_limit'));
+        $estimate = memory_get_usage(true) + $file['width'] * $file['height'] * 12 + 1800 * 1800 * 8 + 20 * 1024 * 1024;
+        if ($limit > 0 && $estimate > $limit) return ['error', 'La foto es demasiado grande para editarla en este servidor. Enviá una versión más pequeña.'];
+        $source = @imagecreatefromjpeg($file['path']);
+        if (!$source) return ['error', 'No pudimos abrir la foto. El archivo original se conserva.'];
+        $partial = ''; $destination = ''; $retain = false;
+        try {
+            if (!orient_photo_image($source, jpeg_orientation($file['path'])) || !rotate_photo_image($source, (int) $rotation)) return ['error', 'No pudimos girar la foto. El archivo original se conserva.'];
+            $width = imagesx($source); $height = imagesy($source);
+            if (($_POST['preview_width'] ?? '') !== '' || ($_POST['preview_height'] ?? '') !== '') {
+                if (photo_integer('preview_width') !== $width || photo_integer('preview_height') !== $height) return ['error', 'La vista previa no coincide con la foto. Guardá solo el giro y volvé a abrirla antes de recortar.'];
+            }
+            if ($crop) {
+                if ($crop['crop_width'] < 1 || $crop['crop_height'] < 1 || $crop['crop_x'] + $crop['crop_width'] > $width || $crop['crop_y'] + $crop['crop_height'] > $height) return ['error', 'El recorte tiene que quedar dentro de la foto girada.'];
+                $cropped = @imagecrop($source, ['x'=>$crop['crop_x'], 'y'=>$crop['crop_y'], 'width'=>$crop['crop_width'], 'height'=>$crop['crop_height']]);
+                if (!$cropped) return ['error', 'No pudimos recortar la foto. El archivo original se conserva.'];
+                imagedestroy($source); $source = $cropped;
+            }
+            if ((int) $rotation === 0 && !$crop && jpeg_orientation($file['path']) === 1) return ['error', 'Elegí un giro o un recorte antes de guardar.'];
+            // New immutable filename: readers never see partially overwritten pixels.
+            $filename = bin2hex(random_bytes(10)) . '.jpg';
+            $destination = $file['directory'] . '/' . $filename;
+            $partial = $destination . '.tmp';
+            if (!write_clean_photo($source, $partial) || !@rename($partial, $destination)) return ['error', 'No pudimos guardar la foto. El archivo original se conserva.'];
+            $new = $current;
+            $new['photos'] = array_map(static fn(string $name): string => $name === $photo ? $filename : $name, $current['photos']);
+            $new['updated_at'] = now_iso();
+            $records = read_dataset($dataset);
+            foreach ($records as &$item) if ($item['id'] === $id) $item = $new;
+            unset($item);
+            $datasets = [$dataset=>$records];
+            if ($dataset === 'submissions') {
+                $dogs = read_dataset('dogs');
+                foreach ($dogs as &$dog) if (($dog['source_submission_id'] ?? '') === $id) {
+                    $dog['photos'] = $new['photos']; $dog['updated_at'] = now_iso();
+                }
+                unset($dog); $datasets['dogs'] = $dogs;
+            }
+            $events = read_dataset('moderation');
+            $events[] = ['id'=>random_id('mod-'), 'action'=>'photo_edited', 'record_id'=>$id, 'note'=>'Foto girada o recortada', 'admin'=>current_admin_account_id(), 'created_at'=>now_iso()];
+            $datasets['moderation'] = $events;
+            try {
+                if (!commit_datasets($datasets)) return ['error', 'No se pudo guardar la edición. El archivo original se conserva.'];
+            } catch (Throwable $error) {
+                // Once a durable journal exists, recovery needs the complete new file.
+                $retain = is_file(PERRO_DATA . '/transaction.json');
+                throw $error;
+            }
+            $retain = true;
+            @unlink($file['path']);
+            return ['success', 'Foto guardada. El giro y el recorte se aplicaron a la ficha.', $filename];
+        } finally {
+            imagedestroy($source);
+            if ($partial !== '') @unlink($partial);
+            if (!$retain && $destination !== '') @unlink($destination);
+        }
+    });
+}
+
+function admin_photo_routes(): void
+{
+    require_admin();
+    if (method_is_post()) require_csrf();
+    $get = static fn(string $key): string => is_string($_GET[$key] ?? null) ? $_GET[$key] : '';
+    $dataset = method_is_post() ? text('dataset', 30) : $get('dataset');
+    $id = method_is_post() ? text('id', 100) : $get('id');
+    $photo = method_is_post() ? text('photo', 100) : $get('photo');
+    if (!in_array($dataset, ['submissions', 'dogs'], true) || !($record = find_record($dataset, $id))) {
+        render_error_page('Foto no encontrada', 'Volvé al panel para elegir una ficha.', 404); exit;
+    }
+    if ($dataset === 'dogs' && !empty($record['source_submission_id']) && find_record('submissions', $record['source_submission_id'])) {
+        redirect('admin/photo?dataset=submissions&id=' . rawurlencode($record['source_submission_id']) . '&photo=' . rawurlencode($photo));
+    }
+    $file = admin_photo_file($record, $photo);
+    if (!$file) { render_error_page('Foto no disponible', 'El editor trabaja con las fotos JPEG guardadas. Volvé a la ficha para elegir otra.', 404); exit; }
+    $back = '/admin/edit?dataset=' . $dataset . '&id=' . rawurlencode($id);
+    if (method_is_post()) {
+        $result = edit_admin_photo($dataset, $id, $photo);
+        set_flash($result[0], $result[1]);
+        redirect('admin/photo?dataset=' . $dataset . '&id=' . rawurlencode($id) . '&photo=' . rawurlencode($result[2] ?? $photo));
+    }
+    render_header(page_meta('Girar y recortar foto | Perro', 'Edición privada de fotos.', 'admin/photo', false));
+    ?><section class="section"><div class="shell narrow"><a class="text-link" href="<?= h($back) ?>">← Volver a la ficha</a><h1>Girá y recortá la foto</h1><p><?= h($record['name']) ?>. Estos cambios se guardan por separado de los datos de la ficha.</p>
+    <?php if (!function_exists('imagecreatefromstring')): ?><div class="notice">No se pueden girar ni recortar fotos sin GD. El archivo se conserva; avisale al equipo para habilitarlo.</div>
+    <?php else: ?><form class="submission-form photo-editor" method="post" action="/admin/photo">
+    <?= csrf_field() ?><input type="hidden" name="dataset" value="<?= h($dataset) ?>"><input type="hidden" name="id" value="<?= h($id) ?>"><input type="hidden" name="photo" value="<?= h($photo) ?>"><input type="hidden" name="revision" value="<?= h(record_revision($record)) ?>"><input type="hidden" name="preview_width" value=""><input type="hidden" name="preview_height" value="">
+    <img class="photo-editor-original" src="/admin/media/<?= h($id) ?>/<?= h($photo) ?>" alt="Foto de <?= h($record['name']) ?> para girar y recortar">
+    <canvas class="photo-editor-canvas" hidden aria-label="Vista previa de la foto y el recorte"></canvas>
+    <label>Giro<select name="rotation"><option value="0">Sin giro</option><option value="270">90° a la izquierda</option><option value="90">90° a la derecha</option><option value="180">180°</option></select></label>
+    <div class="button-row photo-editor-buttons" hidden><button class="button button-secondary" type="button" data-photo-turn="-90">↶ Girar izquierda</button><button class="button button-secondary" type="button" data-photo-turn="90">↷ Girar derecha</button><button class="button button-secondary" type="button" data-photo-reset>Quitar recorte</button></div>
+    <p class="field-help">Con JavaScript, arrastrá sobre la foto para elegir el recorte. También podés usar los campos en píxeles. Primero se aplica el giro; después, el recorte sobre la foto girada. Sin JavaScript podés elegir un giro y guardarlo.</p>
+    <fieldset><legend>Recorte opcional en píxeles</legend><p>Dejá los cuatro campos vacíos para conservar toda la foto. El recorte se guarda de forma definitiva.</p><div class="field-grid photo-crop-fields"><?php foreach (['crop_x'=>'Desde la izquierda (X)', 'crop_y'=>'Desde arriba (Y)', 'crop_width'=>'Ancho', 'crop_height'=>'Alto'] as $key=>$label): ?><label><?= h($label) ?><input type="number" name="<?= $key ?>" min="<?= str_contains($key, 'width') || str_contains($key, 'height') ? '1' : '0' ?>" step="1" max="99999" inputmode="numeric"></label><?php endforeach; ?></div></fieldset>
+    <p class="photo-editor-status field-help" role="status" aria-live="polite"></p><div class="editor-save-bar"><button class="button button-full" type="submit">Guardar foto</button><a class="text-link" href="<?= h($back) ?>">Volver sin guardar</a></div>
+    </form><?php endif; ?></div></section><?php render_footer(); exit;
+}
+
 function admin_edit_routes(string $path): void
 {
+    if ($path === 'admin/photo') admin_photo_routes();
     if (preg_match('#^admin/media/([a-z0-9-]+)/([a-z0-9._-]+)$#i', $path, $matches)) {
         require_admin();
         $record = find_record('submissions', $matches[1]) ?? find_record('dogs', $matches[1]);
@@ -261,10 +396,10 @@ function admin_edit_routes(string $path): void
     foreach ($labels as $key => $label): ?><label><?= h($label) ?><?php if (isset(listing_options()[$key])): ?><select name="<?= h($key) ?>"><?php select_options(listing_options()[$key], ($record[$key] ?? '') ?: (in_array($key, ['vaccination_status', 'sterilization_status'], true) ? 'No informado' : '')); ?></select><?php else: ?><input name="<?= h($key) ?>" type="<?= $key === 'incident_date' ? 'date' : 'text' ?>" maxlength="<?= listing_fields()[$key] ?>" value="<?= h($record[$key] ?? '') ?>"><?php endif; ?></label><?php endforeach; ?>
     </div><label class="check"><input type="checkbox" name="mixed_breed" value="1" <?= !empty($record['mixed_breed']) ? 'checked' : '' ?>> Es mestizo o la raza es aproximada</label>
     <?php foreach (['description'=>'Historia y personalidad', 'health_information'=>'Salud', 'compatibility'=>'Compatibilidad', 'reason'=>'Motivo del aviso', 'adoption_requirements'=>'Requisitos de adopción'] as $key => $label): ?><label><?= h($label) ?><textarea name="<?= h($key) ?>" maxlength="<?= listing_fields()[$key] ?>" <?= $key === 'description' ? 'required minlength="40"' : '' ?>><?= h($record[$key] ?? '') ?></textarea></label><?php endforeach; ?></fieldset>
-    <fieldset><legend>Fotos y privacidad</legend><p>Revisá que las fotos no expongan domicilios, documentos ni datos ajenos. Destildá una foto para retirarla.</p><div class="review-photos">
-    <?php foreach ($record['photos'] ?? [] as $photo): ?><label><img src="/admin/media/<?= h($id) ?>/<?= h($photo) ?>" alt="Foto para revisión de <?= h($record['name']) ?>"><span><input type="checkbox" name="keep_photos[]" value="<?= h($photo) ?>" checked> Conservar esta foto</span></label><?php endforeach; ?></div>
+    <fieldset><legend>Fotos y privacidad</legend><p>Revisá que las fotos no expongan domicilios, documentos ni datos ajenos. Destildá una foto para retirarla. Guardá los cambios de la ficha antes de abrir el editor de una foto: el giro y el recorte se guardan por separado.</p><div class="review-photos">
+    <?php foreach ($record['photos'] ?? [] as $photo): ?><div class="review-photo"><label><img src="/admin/media/<?= h($id) ?>/<?= h($photo) ?>" alt="Foto para revisión de <?= h($record['name']) ?>"><span><input type="checkbox" name="keep_photos[]" value="<?= h($photo) ?>" checked> Conservar esta foto</span></label><?php if (admin_photo_file($record, $photo)): ?><a class="button button-small button-secondary" href="/admin/photo?dataset=<?= h($dataset) ?>&amp;id=<?= h($id) ?>&amp;photo=<?= h($photo) ?>">Girar y recortar</a><?php endif; ?></div><?php endforeach; ?></div>
     <label>Agregar fotos<input type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple></label><label class="check"><input type="checkbox" name="photo_authorized" value="1"> Tengo permiso para agregar las fotos nuevas.</label>
-    <p><strong>Permisos actuales:</strong> nombre <?= ($record['public_name'] ?? false) === true ? h($record['public_display_name'] ?? $record['contact_name'] ?? '') : 'privado' ?> · WhatsApp <?= !empty($record['public_whatsapp'] ?? $record['contact_whatsapp'] ?? '') ? 'autorizado' : 'privado' ?>.</p>
+    <p><strong>Permisos actuales:</strong> nombre <?= ($record['public_name'] ?? false) === true ? h($record['public_display_name'] ?? $record['contact_name'] ?? '') : 'privado' ?> · <?= h(whatsapp_visibility_label(($record['public_whatsapp'] ?? false) === true || ($dataset === 'dogs' && !empty($record['contact_whatsapp'])))) ?>.</p>
     <label class="check"><input type="checkbox" name="hide_name" value="1"> Retirar el nombre público (revocar permiso)</label><label class="check"><input type="checkbox" name="hide_whatsapp" value="1"> Retirar el WhatsApp público (revocar permiso)</label><p>No se puede conceder un nuevo permiso en nombre del responsable. Necesita un nuevo envío con su autorización.</p></fieldset>
     <fieldset><legend>Revisión interna</legend><label>Nota privada<textarea name="internal_note" maxlength="1500"><?= h($record['internal_note'] ?? '') ?></textarea></label><label class="check"><input type="checkbox" name="review_confirm" value="1" required> Revisé los datos, las fotos y los permisos. Confirmé con el responsable cualquier cambio de situación; el aviso no ofrece venta, cría ni cobros por entrega.</label></fieldset><div class="editor-save-bar"><button class="button button-full" type="submit">Guardar correcciones</button><a class="text-link" href="/admin">Volver sin guardar</a></div></form></div></section>
     <?php render_footer(); exit;

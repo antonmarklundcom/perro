@@ -7,7 +7,7 @@ Sitio ligero para difusión y moderación de adopciones de perros en Paraguay. N
 - PHP 8.1 o superior.
 - Apache con `mod_rewrite` y soporte para `.htaccess`.
 - Permiso de escritura en `storage/data` y `storage/uploads`.
-- Extensión GD para recibir, redimensionar y limpiar fotos. Sin GD, las fichas de texto siguen funcionando y el formulario explica que las fotos están deshabilitadas.
+- Extensión GD para recibir, redimensionar y limpiar fotos. GD con FreeType y las fuentes incluidas en assets/fonts permite generar las imágenes para compartir. Sin GD, las fichas de texto siguen funcionando y el formulario explica que las fotos están deshabilitadas.
 
 ## Subida a Hostinger
 
@@ -32,6 +32,16 @@ La búsqueda incluye ciudad, departamento, edad, tamaño, sexo, disponibilidad y
 4. Al aprobar, se crea la ficha pública y se fija un vencimiento a 60 días.
 5. La administración puede revisar fotos privadas, editar datos y fotos, retirar permisos de contacto y gestionar estados según el tipo de aviso. Adoptados y reencontrados dejan de aparecer públicamente. Para renovar o reabrir un aviso, debe confirmar su vigencia con el responsable.
 6. Repetir una aprobación no duplica ni reabre una ficha. Las solicitudes antiguas sin aceptación de las reglas actuales necesitan un nuevo envío del responsable.
+
+## Compartir y mantener avisos
+
+La página /como-funciona explica el envío sin cuenta, los datos privados, la revisión, los cambios por WhatsApp con referencia y la confirmación de vigencia. La referencia ayuda a localizar el envío; el equipo verifica la relación del solicitante con el aviso antes de modificarlo. La confirmación de envío ofrece borradores separados para correcciones, retiro y cambio de estado.
+
+Cada ficha aprobada y vigente tiene una sección /perro/{slug}#compartir con Facebook, WhatsApp, texto y enlace para copiar. Con una foto válida y GD/FreeType, ofrece JPEG de publicación (1080×1080) e historia (1080×1920); la vista previa de Facebook usa 1200×630. Se usa la primera foto real de la ficha y solo nombre, ciudad, tipo, estado e identificador público. El código público de ficha impreso en la imagen también se puede buscar en el catálogo correspondiente; es distinto de la referencia privada del envío. No se copian nombres/contactos del responsable, notas, referencias privadas ni la descripción a los materiales. Las fuentes Atkinson Hyperlegible se distribuyen con su licencia OFL.
+
+Las rutas /compartir/{slug}/{facebook|post|story}.jpg comprueban en cada solicitud que el aviso siga activo. No sirven imágenes pendientes, vencidas, retiradas, adoptadas o reencontradas. Las descargas se generan sin caché ni servicios externos y no añaden datos de almacenamiento. El panel de avisos ofrece un acceso directo al material y el borrador de publicación señala dónde encontrarlo.
+
+Instagram requiere subir el archivo manualmente y agregar el enlace de la ficha al sticker de una historia. Sin GD/FreeType o sin foto, siguen disponibles el texto y el enlace; una ficha sin foto no usa la imagen ilustrativa del sitio como si fuera su perro. Las copias descargadas y las vistas previas que guarda una red social no se actualizan ni se pueden retirar desde Perro. Revisá la ficha antes de volver a difundirla.
 
 ## Cuentas de administración
 

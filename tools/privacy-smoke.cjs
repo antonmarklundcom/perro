@@ -43,6 +43,9 @@ async function run() {
   const routes=['/','/perros','/dar-perro-en-adopcion','/perros-perdidos-paraguay','/como-funciona','/centros-de-adopcion','/seguridad','/terminos','/privacidad','/cachorros-en-adopcion','/perros-de-raza-en-adopcion','/admin','/robots.txt','/sitemap.xml'];
   for(const route of routes) check('route '+route,(await visitor(route)).status===200);
   for(const route of ['/config.php','/storage/data/submissions.json','/includes/legal.php','/AGENTS.md','/LEGAL-RELEASE.md','/tools/privacy-smoke.cjs','/.git/config','/assets/%2e%2e/storage/data/submissions.json','/%69ncludes/data.php']) check('private route '+route,(await visitor(route)).status===404);
+  const guide=await visitor('/como-funciona');
+  check('guide covers account-free private reference-based moderation and sharing', ['Sin crear una cuenta','Diana','referencia','identidad','Instagram','se renueva automáticamente','donaciones obligatorias'].every(value=>guide.html.includes(value)));
+  check('guide links actual form policy and team contact',guide.html.includes('https://perro.com.py/dar-perro-en-adopcion')&&guide.html.includes('https://wa.me/595992279599')&&guide.html.includes('https://perro.com.py/privacidad'));
   const token=html=>html.match(/name="csrf_token" value="([^"]+)"/)[1];
   const home=await visitor('/');
   const release=home.headers.get('x-perro-release');
@@ -97,6 +100,9 @@ async function run() {
   check('WhatsApp-only submission persists without email',optionalResponse.headers.get('location')==='/gracias'&&data('submissions').at(-1).email==='');
   const receipt=await user('/gracias'),refreshReceipt=await user('/gracias');
   check('receipt reference survives refresh',receipt.html.includes(data('submissions').at(-1).reference)&&refreshReceipt.html.includes(data('submissions').at(-1).reference));
+  check('receipt offers referenced correction removal and status drafts', ['Consultar o corregir','Solicitar retiro','Avisar un cambio de estado','/como-funciona'].every(value=>receipt.html.includes(value)) && decodeURIComponent(receipt.html).includes('Referencia: '+data('submissions').at(-1).reference));
+  check('no-photo listing has text sharing but no fake photo preview',profile.html.includes('Compartir en Facebook')&&profile.html.includes('Copiar texto')&&!profile.html.includes('property="og:image"'));
+  check('no-photo image route fails closed',(await visitor('/compartir/'+firstDog.slug+'/post.jpg')).status===404);
   await user('/enviar-perro',{...fields,email:'invalid-email'});
   check('provided invalid email rejected',data('submissions').length===2);
   const baselineDogs=data('dogs');
@@ -183,6 +189,7 @@ async function run() {
   check('lost profile uses recovery context and incident facts',lostProfile.html.includes('Perro perdido')&&lostProfile.html.includes('2026-10-01')&&lostProfile.html.includes('Zona aproximada LOCAL')&&!lostProfile.html.includes('sobre su adopción responsable'));
   check('lost dog appears only in recovery listings',(await visitor('/perros-perdidos-paraguay')).html.includes(lost.name)&&!(await visitor('/perros')).html.includes(lost.name));
   check('lost search combines type city and sex',(await visitor('/perros-perdidos-paraguay?type=lost&city=asuncion&sex=Macho')).html.includes(lost.name));
+  check('recovery listing can be found by its public code',(await visitor('/perros-perdidos-paraguay?q='+lost.slug.split('-').at(-1))).html.includes('<h2><a href="/perro/'+lost.slug+'">'));
   check('found filter excludes lost dogs',!(await visitor('/perros-perdidos-paraguay?type=found')).html.includes(lost.name));
   await state(lost.id,'adopted');
   check('lost listing cannot be marked adopted',data('dogs').find(d=>d.id===lost.id).adoption_status==='available');
@@ -202,6 +209,11 @@ async function run() {
   dogs[0].photos=['audit.png'];writeData('dogs',dogs);
   let photo=await visitor('/media/'+dogs[0].id+'/audit.png');
   check('published photos use no-store',photo.status===200&&photo.headers.get('cache-control')==='no-store');
+  if(!process.env.PERRO_PHP_GD_DIR) {
+    const plainShare=await visitor('/perro/'+dogs[0].slug);
+    check('no-GD sharing still offers caption and original photo preview',plainShare.html.includes('Copiar texto')&&plainShare.html.includes('media/'+dogs[0].id+'/audit.png')&&!plainShare.html.includes('Descargar imagen para historia'));
+    check('no-GD generated image fails gracefully',(await visitor('/compartir/'+dogs[0].slug+'/post.jpg')).status===503);
+  }
   dogs[0].expires_at='2020-01-01T00:00:00-03:00';writeData('dogs',dogs);
   check('expired photo revoked',(await visitor('/media/'+dogs[0].id+'/audit.png')).status===404);
   dogs[0].expires_at='2099-01-01T00:00:00-03:00';dogs[0].status='removed';writeData('dogs',dogs);
@@ -237,11 +249,41 @@ async function run() {
     check('admin can add an authorized photo',data('submissions').find(s=>s.id===photoSubmission.id).photos.length===2);
     const published=await approve(photoSubmission.id);
     check('approved sanitized photo publicly accessible',(await visitor('/media/'+published.id+'/'+filename)).status===200);
+    const sharedProfile=await visitor('/perro/'+published.slug);
+    const ogUrl=sharedProfile.html.match(/property="og:image" content="([^"]+)"/)[1].replaceAll('&amp;','&');
+    const ogPath=new URL(ogUrl).pathname+new URL(ogUrl).search;
+    check('Facebook preview uses generated real-photo card',ogPath.includes('/compartir/'+published.slug+'/facebook.jpg')&&sharedProfile.html.includes('og:image:width" content="1200"')&&sharedProfile.html.includes('og:image:height" content="630"'));
+    check('sharing caption excludes all private owner fields',![fields.submitter_name,fields.email,'595981999999',fields.public_display_name,photoSubmission.reference].some(value=>sharedProfile.html.includes(value)));
+    check('public code on Instagram image can find the approved listing',(await visitor('/perros?q='+published.slug.split('-').at(-1))).html.includes('<h2><a href="/perro/'+published.slug+'">'));
+    const snapshotDogs=data('dogs');
+    for(const [format,width,height] of [['facebook',1200,630],['post',1080,1080],['story',1080,1920]]) {
+      const graphic=await visitor('/compartir/'+published.slug+'/'+format+'.jpg?download=1');
+      const size=JSON.parse(execFileSync(php,['-r',"echo json_encode(getimagesizefromstring(file_get_contents('php://stdin')));"],{input:graphic.bytes,windowsHide:true}).toString());
+      check(format+' graphic is actual JPEG with correct size attachment and private cache policy',graphic.status===200&&graphic.headers.get('content-type')==='image/jpeg'&&size[0]===width&&size[1]===height&&graphic.headers.get('content-disposition').includes('attachment; filename="perro-')&&graphic.headers.get('cache-control').includes('no-store')&&graphic.headers.get('x-robots-tag')==='noindex, nofollow');
+    }
+    const headImage=await fetch(base+ogPath,{method:'HEAD'});
+    check('social image HEAD has same type length and no body',headImage.status===200&&headImage.headers.get('content-type')==='image/jpeg'&&Number(headImage.headers.get('content-length'))>0&&(await headImage.arrayBuffer()).byteLength===0);
+    check('social image cannot be generated by POST',(await visitor(ogPath,{})).status===405);
+    for(const invalid of ['/compartir/'+photoSubmission.id+'/story.jpg','/compartir/'+published.slug+'/raw.jpg','/compartir/'+published.slug+'/story.png','/compartir/'+published.slug+'/%2e%2e%2fconfig.php']) check('invalid social route rejected '+invalid,(await visitor(invalid)).status===404);
+    const privateChange=snapshotDogs.map(d=>d.id===published.id?{...d,contact_name:'PRIVATE CHANGED',contact_whatsapp:'595981888888',internal_note:'PRIVATE NOTE CHANGED'}:d);writeData('dogs',privateChange);
+    check('private edits do not enter image revision or caption',(await visitor('/perro/'+published.slug)).html.includes(ogUrl.replaceAll('&','&amp;')));
+    const publicChange=snapshotDogs.map(d=>d.id===published.id?{...d,name:'Ñandutí '+('Áéíóú '.repeat(10)),city:'San José de los Arroyos',adoption_status:'reserved'}:d);writeData('dogs',publicChange);
+    const revisedProfile=await visitor('/perro/'+published.slug);
+    check('public edits invalidate image URL and caption reflects reservation',!revisedProfile.html.includes(ogUrl.replaceAll('&','&amp;'))&&revisedProfile.html.includes('Adopción · Reservado'));
+    check('long accented text still renders an image',(await visitor('/compartir/'+published.slug+'/story.jpg')).status===200);
+    for(const changed of [{status:'removed'},{expires_at:'2020-01-01T00:00:00-03:00'},{adoption_status:'adopted'},{adoption_status:'reunited'}]) {
+      writeData('dogs',snapshotDogs.map(d=>d.id===published.id?{...d,...changed}:d));
+      check('previously shared image revoked '+JSON.stringify(changed),(await visitor(ogPath)).status===404&&(await visitor('/compartir/'+published.slug+'/story.jpg?download=1')).status===404);
+    }
+    writeData('dogs',snapshotDogs);
+    check('mobile admin exposes approved public sharing toolkit',(await admin('/admin?section=publicadas')).html.includes('/perro/'+published.slug+'#compartir'));
+
     await admin('/admin/edit',{...fields,dataset:'submissions',id:photoSubmission.id,csrf_token:adminCsrf,revision:revision(editor.html),name:photoSubmission.name,review_confirm:'1'});
     // Approval changed the revision: first edit must fail without deleting photos.
     check('stale photo edit preserves image',fs.existsSync(path.join(copy,'storage','uploads',photoSubmission.id,filename)));
     const refreshed=await admin('/admin/edit?dataset=submissions&id='+photoSubmission.id);
     await admin('/admin/edit',{...fields,dataset:'submissions',id:photoSubmission.id,csrf_token:adminCsrf,revision:revision(refreshed.html),name:photoSubmission.name,review_confirm:'1'});
+    check('removed photo also revokes social downloads',(await visitor('/compartir/'+published.slug+'/post.jpg')).status===404);
     check('photo removal updates source public record and file',data('submissions').find(s=>s.id===photoSubmission.id).photos.length===0&&data('dogs').find(d=>d.id===published.id).photos.length===0&&!fs.existsSync(path.join(copy,'storage','uploads',photoSubmission.id,filename))&&(await visitor('/media/'+published.id+'/'+filename)).status===404);
   } else {
     check('missing GD shows clear rejection', (await user('/dar-perro-en-adopcion')).html.includes('habilite GD'));

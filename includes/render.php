@@ -87,11 +87,17 @@ function render_header(array $meta): void
     <meta property="og:title" content="<?= h($meta['title']) ?>">
     <meta property="og:description" content="<?= h($meta['description']) ?>">
     <meta property="og:url" content="<?= h($meta['canonical']) ?>">
+    <meta property="og:site_name" content="Perro.com.py">
+    <?php if (!empty($meta['image'])): ?>
     <meta property="og:image" content="<?= h($meta['image']) ?>">
+    <?php if (!empty($meta['image_width'])): ?><meta property="og:image:width" content="<?= (int) $meta['image_width'] ?>"><meta property="og:image:height" content="<?= (int) $meta['image_height'] ?>"><?php endif; ?>
+    <?php if (!empty($meta['image_type'])): ?><meta property="og:image:type" content="<?= h($meta['image_type']) ?>"><?php endif; ?>
+    <meta property="og:image:alt" content="<?= h($meta['image_alt'] ?? 'Perro: adopción responsable en Paraguay') ?>">
+    <?php endif; ?>
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="<?= h($meta['title']) ?>">
     <meta name="twitter:description" content="<?= h($meta['description']) ?>">
-    <meta name="twitter:image" content="<?= h($meta['image']) ?>">
+    <?php if (!empty($meta['image'])): ?><meta name="twitter:image" content="<?= h($meta['image']) ?>"><meta name="twitter:image:alt" content="<?= h($meta['image_alt'] ?? 'Perro: adopción responsable en Paraguay') ?>"><?php endif; ?>
     <?php render_public_schema($meta); ?>
     <meta name="theme-color" content="#193d32">
     <meta name="perro-release" content="<?= h(perro_release_id()) ?>">
@@ -147,6 +153,7 @@ function render_footer(): void
         </div>
         <div>
             <h2>Información</h2>
+            <a href="/como-funciona">Cómo publicar y actualizar un aviso</a>
             <a href="/seguridad">Adopción segura</a>
             <a href="/terminos">Términos</a>
             <a href="/privacidad">Privacidad</a>

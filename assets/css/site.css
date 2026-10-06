@@ -314,6 +314,22 @@ details[open] > summary { margin-bottom: 12px; }
 }
 
 /* Publishing and moderation controls keep their full text and touch area on phones. */
+.listing-sharing { border-block: 1px solid var(--line); background: var(--sky-2); scroll-margin-top: 90px; }
+.listing-sharing .button-row { margin-block: 18px; }
+.share-caption { margin-block: 22px; }
+.share-caption { min-height: 220px; font-weight: 400; line-height: 1.6; }
+.receipt h2 { margin-top: 28px; font-size: 1.4rem; }
+.receipt-reference { border: 1px solid var(--line); border-radius: 12px; padding: 18px; background: var(--sky-2); margin-block: 24px; }
+.receipt-reference .reference { margin-top: 0; }
+.receipt-reference .copy-status { display: block; margin-top: 8px; }
+.receipt-requests { display: grid; gap: 12px; margin-block: 24px; }
+.admin-share-link { margin-top: 14px; }
+.prose a.button { color: white; }
+.prose a.button-secondary { color: var(--navy); }
+@media (max-width: 760px) {
+  .listing-sharing .button-row { display: grid; grid-template-columns: minmax(0,1fr); }
+  .listing-sharing .button { width: 100%; }
+}
 .text-button { color: var(--navy); background: transparent; border: 0; padding: 12px 0; min-height: 44px; font-weight: 650; text-decoration: underline; text-underline-offset: 4px; text-align: left; }
 .form-progress { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 18px; background: var(--sky); border-radius: 12px; padding: 10px 18px; }
 .form-progress p { margin: 0; font-weight: 700; }

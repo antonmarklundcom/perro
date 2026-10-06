@@ -101,6 +101,77 @@
     window.addEventListener('pageshow', function () { submit.disabled = false; submit.textContent = 'Enviar ficha para revisión'; });
   }
 
+  document.querySelectorAll('.photo-editor').forEach(function (form) {
+    const original = form.querySelector('.photo-editor-original');
+    const canvas = form.querySelector('.photo-editor-canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return; // The ordinary rotation select and submit remain usable.
+    const rotation = form.elements.rotation;
+    const names = ['crop_x', 'crop_y', 'crop_width', 'crop_height'];
+    const fields = names.map(function (name) { return form.elements[name]; });
+    const status = form.querySelector('.photo-editor-status');
+    let ready = false, drag = null;
+    const clearCrop = function () { fields.forEach(function (field) { field.value = ''; field.setCustomValidity(''); }); };
+    const selection = function () {
+      if (fields.every(function (field) { return field.value === ''; })) return null;
+      if (fields.some(function (field) { return !/^\d+$/.test(field.value); })) return false;
+      const values = fields.map(function (field) { return Number(field.value); });
+      const [x, y, width, height] = values;
+      return values.every(Number.isSafeInteger) && width > 0 && height > 0 && x + width <= canvas.width && y + height <= canvas.height ? {x, y, width, height} : false;
+    };
+    const draw = function () {
+      if (!ready) return;
+      const angle = Number(rotation.value);
+      canvas.width = angle % 180 ? original.naturalHeight : original.naturalWidth;
+      canvas.height = angle % 180 ? original.naturalWidth : original.naturalHeight;
+      form.elements.preview_width.value = canvas.width; form.elements.preview_height.value = canvas.height;
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.save(); ctx.translate(canvas.width / 2, canvas.height / 2); ctx.rotate(angle * Math.PI / 180);
+      ctx.drawImage(original, -original.naturalWidth / 2, -original.naturalHeight / 2); ctx.restore();
+      const crop = selection();
+      fields.forEach(function (field) { field.setCustomValidity(''); });
+      if (crop === false) { fields[0].setCustomValidity('Completá los cuatro campos con un recorte dentro de la foto girada.'); status.textContent = 'Revisá las coordenadas: el recorte tiene que quedar dentro de la foto.'; return; }
+      if (crop) {
+        ctx.fillStyle = 'rgba(0,0,0,.42)';
+        ctx.fillRect(0, 0, canvas.width, crop.y); ctx.fillRect(0, crop.y + crop.height, canvas.width, canvas.height - crop.y - crop.height);
+        ctx.fillRect(0, crop.y, crop.x, crop.height); ctx.fillRect(crop.x + crop.width, crop.y, canvas.width - crop.x - crop.width, crop.height);
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(2, canvas.width / 300); ctx.strokeRect(crop.x, crop.y, crop.width, crop.height);
+        status.textContent = 'Recorte: ' + crop.width + ' × ' + crop.height + ' px. Se aplica al guardar la foto.';
+      } else status.textContent = 'Foto girada: ' + canvas.width + ' × ' + canvas.height + ' px. Arrastrá para recortar o guardá solo el giro.';
+    };
+    const start = function () {
+      if (!original.naturalWidth || original.naturalWidth * original.naturalHeight > 8000000) return;
+      ready = true; original.hidden = true; canvas.hidden = false; form.querySelector('.photo-editor-buttons').hidden = false; draw();
+    };
+    original.addEventListener('load', start);
+    if (original.complete) start();
+    rotation.addEventListener('change', function () { clearCrop(); draw(); });
+    form.querySelectorAll('[data-photo-turn]').forEach(function (button) { button.addEventListener('click', function () { rotation.value = String((Number(rotation.value) + Number(button.dataset.photoTurn) + 360) % 360); clearCrop(); draw(); }); });
+    form.querySelector('[data-photo-reset]').addEventListener('click', function () { clearCrop(); draw(); });
+    fields.forEach(function (field) { field.addEventListener('input', draw); });
+    const point = function (event) {
+      const rect = canvas.getBoundingClientRect();
+      return {x:Math.max(0, Math.min(canvas.width, Math.round((event.clientX - rect.left) * canvas.width / rect.width))), y:Math.max(0, Math.min(canvas.height, Math.round((event.clientY - rect.top) * canvas.height / rect.height)))};
+    };
+    canvas.addEventListener('pointerdown', function (event) {
+      if (!ready || !event.isPrimary || event.button !== 0) return;
+      drag = {id:event.pointerId, start:point(event), previous:fields.map(function (field) { return field.value; }), clientX:event.clientX, clientY:event.clientY};
+      canvas.setPointerCapture(event.pointerId); event.preventDefault();
+    });
+    canvas.addEventListener('pointermove', function (event) {
+      if (!drag || drag.id !== event.pointerId) return;
+      const end = point(event), x = Math.min(drag.start.x, end.x), y = Math.min(drag.start.y, end.y);
+      [x, y, Math.max(1, Math.abs(drag.start.x - end.x)), Math.max(1, Math.abs(drag.start.y - end.y))].forEach(function (value, i) { fields[i].value = String(value); }); draw();
+    });
+    const finish = function (event) {
+      if (!drag || drag.id !== event.pointerId) return;
+      if (event.type === 'pointercancel' || Math.max(Math.abs(event.clientX - drag.clientX), Math.abs(event.clientY - drag.clientY)) < 8) fields.forEach(function (field, i) { field.value = drag.previous[i]; });
+      drag = null; draw();
+    };
+    canvas.addEventListener('pointerup', finish); canvas.addEventListener('pointercancel', finish);
+    form.addEventListener('submit', function (event) { if (drag) { event.preventDefault(); return; } draw(); if (!form.reportValidity()) event.preventDefault(); });
+  });
+
   document.querySelectorAll('input[type="file"][multiple]').forEach(function (input) {
     const message = document.createElement('span');
     message.className = 'field-help'; message.setAttribute('aria-live', 'polite');

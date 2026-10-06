@@ -248,13 +248,15 @@ if ($path === 'admin/action' && method_is_post()) {
 
 if ($path === 'admin/export.csv') {
     require_admin();
+    header('Cache-Control: no-store');
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="perro-listados-' . date('Y-m-d') . '.csv"');
     $out = fopen('php://output', 'wb');
     fwrite($out, "\xEF\xBB\xBF");
-    fputcsv($out, ['ID', 'Nombre', 'Tipo', 'Estado', 'Ciudad', 'Departamento', 'Publicado', 'Vence']);
+    fputcsv($out, ['ID', 'Nombre', 'Tipo', 'Estado', 'Estado de adopción o reencuentro', 'Ciudad', 'Departamento', 'Publicado', 'Vence', 'Responsable (contacto privado)', 'Correo privado', 'WhatsApp privado', 'Referencia privada del envío']);
     foreach (read_dataset('dogs') as $dog) {
-        fputcsv($out, array_map(static fn($value): string => preg_match('/^[\s]*[=+@-]/u', (string) $value) ? "'" . $value : (string) $value, [$dog['id'], $dog['name'], $dog['listing_type'], $dog['status'], $dog['city'], $dog['department'], $dog['published_at'], $dog['expires_at']]));
+        $contact = admin_dog_contact_record($dog);
+        fputcsv($out, array_map(static fn($value): string => preg_match('/^[\s]*[=+@-]/u', (string) $value) ? "'" . $value : (string) $value, [$dog['id'], $dog['name'], record_status_label($dog['listing_type'] ?? 'adoption'), record_status_label($dog['status'] ?? ''), record_status_label($dog['adoption_status'] ?? ''), $dog['city'], $dog['department'], $dog['published_at'], $dog['expires_at'], $contact['submitter_name'] ?? '', $contact['email'] ?? '', $contact['whatsapp'] ?? '', $contact['reference'] ?? '']));
     }
     fclose($out);
     exit;

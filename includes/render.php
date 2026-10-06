@@ -15,7 +15,12 @@ function search_text(string $value): string
 
 function record_status_label(string $status): string
 {
-    return ['pending'=>'Pendiente', 'approved'=>'Aprobada', 'rejected'=>'Rechazada', 'published'=>'Publicada', 'removed'=>'Retirada', 'expired'=>'Vencida', 'available'=>'Disponible', 'reserved'=>'Reservado', 'adopted'=>'Adoptado', 'reunited'=>'Reencontrado', 'open'=>'Abierto', 'resolved'=>'Resuelto'][$status] ?? 'Sin estado informado';
+    return ['pending'=>'Pendiente', 'approved'=>'Aprobada', 'rejected'=>'Rechazada', 'published'=>'Publicada', 'removed'=>'Retirada', 'withdrawn'=>'Retirada', 'expired'=>'Vencida', 'available'=>'Disponible', 'reserved'=>'Reservado', 'adopted'=>'Adoptado', 'reunited'=>'Reencontrado', 'open'=>'Abierto', 'resolved'=>'Resuelto', 'active'=>'Activo', 'all'=>'Todas', 'adoption'=>'Adopción', 'lost'=>'Perdido', 'found'=>'Encontrado'][$status] ?? 'Sin estado informado';
+}
+
+function whatsapp_visibility_label(bool $public): string
+{
+    return $public ? 'Autorizó mostrar su WhatsApp en la ficha pública' : 'WhatsApp privado';
 }
 
 function page_meta(string $title, string $description, string $path = '', bool $indexable = true, ?string $image = null): array

@@ -23,6 +23,7 @@ async function run() {
   const password=crypto.randomBytes(24).toString('base64url');
   const php=process.env.PERRO_PHP_BIN || 'php';
   const gdArgs=process.env.PERRO_PHP_GD_DIR ? ['-d','extension_dir='+process.env.PERRO_PHP_GD_DIR,'-d','extension=gd'] : [];
+  if(process.env.PERRO_PHP_EXIF === '1') gdArgs.push('-d','extension=exif');
   processHandle=spawn(php,[...gdArgs,'-d','upload_max_filesize=5M','-d','post_max_size=30M','-d','memory_limit=128M','-S','127.0.0.1:'+port,'router.php'],{
     cwd:copy, windowsHide:true, env:{...process.env,
       PERRO_ADMIN_PASSWORD_SHA256:crypto.createHash('sha256').update(password).digest('hex'),
@@ -89,11 +90,27 @@ async function run() {
   async function approve(id) { await admin('/admin/action',{csrf_token:adminCsrf,dataset:'submissions',id,action:'approve',review_confirm:'1'}); return data('dogs').at(-1); }
   await admin('/admin/action',{csrf_token:adminCsrf,dataset:'submissions',id:submission.id,action:'approve'});
   check('approval requires explicit review',data('dogs').length===0);
+  const queueText=panel.html.replace(/<[^>]*>/g,' ');
+  check('admin queue card and filter statuses are Spanish',queueText.includes('Pendiente')&&queueText.includes('Adopción')&&!/\b(?:pending|approved|rejected|adoption|lost|found)\b/.test(queueText));
+  check('private WhatsApp wording is explicit',panel.html.includes('WhatsApp privado')&&!panel.html.includes('WhatsApp autorizado'));
+  check('unauthenticated CSV export is blocked',(await visitor('/admin/export.csv')).headers.get('location')==='/admin');
+
   let dog=await approve(submission.id),profile=await visitor('/perro/'+dog.slug);
   check('private names not copied to public dog',dog.contact_name===''&&dog.public_name===false);
   check('no private name/email/phone leak after approval',![fields.submitter_name,fields.email,'595981999999',fields.public_display_name].some(value=>profile.html.includes(value)));
   check('private-contact profile offers working mediation link',profile.html.includes('Consultar al equipo de Perro')&&profile.html.includes('https://wa.me/595992279599'));
   const firstDog=dog;
+  const contactOverview=await admin('/admin?section=publicadas');
+  check('admin overview keeps private source WhatsApp name email and reference',[submission.whatsapp,submission.submitter_name,submission.email,submission.reference,'WhatsApp privado de contacto'].every(value=>contactOverview.html.includes(value)));
+  const csv=await admin('/admin/export.csv');
+  const csvRows=JSON.parse(execFileSync(php,['-r',"$f=fopen('php://stdin','rb');$rows=[];while(($r=fgetcsv($f))!==false)$rows[]=$r;echo json_encode($rows);"],{input:csv.bytes,windowsHide:true}).toString());
+  check('private CSV includes WhatsApp alongside private contact details',csv.status===200&&csv.headers.get('cache-control')==='no-store'&&csvRows[0].includes('WhatsApp privado')&&csvRows[1].includes(submission.whatsapp)&&csvRows[1].includes(submission.submitter_name)&&csvRows[1].includes(submission.email)&&csvRows[1].includes(submission.reference));
+  check('CSV listing and adoption statuses are Spanish',csvRows[1][2]==='Adopción'&&csvRows[1][3]==='Publicada'&&csvRows[1][4]==='Disponible');
+  const safeContacts=data('submissions'),unsafeContacts=safeContacts.map(r=>r.id===submission.id?{...r,submitter_name:'=LOCAL CSV',email:'+LOCAL CSV',whatsapp:'+595981999999',reference:'@LOCAL CSV'}:r);writeData('submissions',unsafeContacts);
+  const escapedCSV=await admin('/admin/export.csv');
+  check('new private CSV fields retain spreadsheet injection protection',["'=LOCAL CSV","'+LOCAL CSV","'+595981999999","'@LOCAL CSV"].every(value=>escapedCSV.html.includes(value)));
+  writeData('submissions',safeContacts);
+
   check('submission form email is optional',!/<input[^>]*name="email"[^>]*required/.test(form.html)&&form.html.includes('opcional, privado'));
   check('first visit starts guided form',form.html.includes('data-retry="0"'));
   const optionalResponse=await user('/enviar-perro',{...fields,name:'LOCAL NO EMAIL DOG',email:''});
@@ -148,6 +165,7 @@ async function run() {
   check('approved submission cannot be rejected',data('submissions')[0].status==='approved');
   await user('/enviar-perro',{...fields,name:'OPT IN DOG',name_visibility:'public',public_display_name:'PUBLIC ALIAS <img src=x>',public_whatsapp:'1'});
   dog=await approve(data('submissions').at(-1).id); profile=await visitor('/perro/'+dog.slug);
+  check('admin consent explains permission to display publicly',(await admin('/admin?queue=all')).html.includes('Autorizó mostrar su WhatsApp en la ficha pública'));
   check('separate name and WhatsApp opt-in works',profile.html.includes('PUBLIC ALIAS &lt;img src=x&gt;')&&profile.html.includes('https://wa.me/595981999999'));
   check('full name stays private even with public alias',!profile.html.includes(fields.submitter_name));
   const optInSubmission=data('submissions').at(-1), optInDog=dog;
@@ -225,14 +243,29 @@ async function run() {
   check('invalid photo rejects complete submission',data('submissions').length===beforeUploads);
   const withGD=form.html.includes('name="photos[]"');
   if(withGD) {
-    const image=execFileSync(php,[...gdArgs,'-r','$image=imagecreatetruecolor(12,12);imagepng($image);imagedestroy($image);']);
+    const image=execFileSync(php,[...gdArgs,'-r','$image=imagecreatetruecolor(120,80);foreach([[0,0,59,39,255,0,0],[60,0,119,39,0,255,0],[0,40,59,79,0,0,255],[60,40,119,79,255,255,0]] as $r){imagefilledrectangle($image,$r[0],$r[1],$r[2],$r[3],imagecolorallocate($image,$r[4],$r[5],$r[6]));}imagepng($image);imagedestroy($image);']);
+    const jpeg=execFileSync(php,[...gdArgs,'-r',"$i=imagecreatefromstring(file_get_contents('php://stdin'));imagejpeg($i,null,98);"],{input:image,windowsHide:true});
+    const exifSupported=execFileSync(php,[...gdArgs,'-r',"echo function_exists('exif_read_data')?'yes':'no';"],{windowsHide:true}).toString()==='yes';
+    const corners=[[255,0,0],[0,255,0],[0,0,255],[255,255,0]];
+    const expected=[[0,1,2,3],[1,0,3,2],[3,2,1,0],[2,3,0,1],[0,2,1,3],[2,0,3,1],[3,1,2,0],[1,3,0,2]];
+    for(let orientation=1;orientation<=8;orientation++) {
+      const tiff=Buffer.alloc(26);tiff.write('II');tiff.writeUInt16LE(42,2);tiff.writeUInt32LE(8,4);tiff.writeUInt16LE(1,8);tiff.writeUInt16LE(0x112,10);tiff.writeUInt16LE(3,12);tiff.writeUInt32LE(1,14);tiff.writeUInt16LE(orientation,18);
+      const payload=Buffer.concat([Buffer.from('Exif\0\0'),tiff]),marker=Buffer.alloc(4);marker.writeUInt16BE(0xffe1,0);marker.writeUInt16BE(payload.length+2,2);
+      const tagged=Buffer.concat([jpeg.subarray(0,2),marker,payload,jpeg.subarray(2)]);
+      await user('/enviar-perro',await multipart({...fields,name:'LOCAL EXIF '+orientation},[{name:'phone.jpg',type:'image/jpeg',bytes:tagged}]));
+      const orientedRecord=data('submissions').at(-1);check('EXIF fixture submission accepted '+orientation,orientedRecord.name==='LOCAL EXIF '+orientation);
+      const sanitized=fs.readFileSync(path.join(copy,'storage/uploads',orientedRecord.id,orientedRecord.photos[0]));
+      const actual=JSON.parse(execFileSync(php,[...gdArgs,'-r',"$i=imagecreatefromstring(file_get_contents('php://stdin'));$w=imagesx($i);$h=imagesy($i);$c=[];foreach([[10,10],[$w-11,10],[10,$h-11],[$w-11,$h-11]] as $p){$v=imagecolorat($i,$p[0],$p[1]);$c[]=[($v>>16)&255,($v>>8)&255,$v&255];}echo json_encode([$w,$h,$c]);"],{input:sanitized,windowsHide:true}).toString());
+      const mapped=exifSupported?expected[orientation-1]:expected[0],swap=exifSupported&&orientation>=5;
+      check('EXIF orientation/mirroring normalized before metadata removal '+orientation,actual[0]===(swap?80:120)&&actual[1]===(swap?120:80)&&actual[2].every((rgb,i)=>rgb.every((v,c)=>Math.abs(v-corners[mapped[i]][c])<25))&&!sanitized.includes(Buffer.from('Exif')));
+    }
     const beforeOversize=data('submissions').length;
     await user('/enviar-perro',await multipart(fields,[{name:'too-large.png',bytes:Buffer.alloc(6*1024*1024)}]));
     check('over-limit individual upload rejected',data('submissions').length===beforeOversize);
     await user('/enviar-perro',await multipart(fields,Array.from({length:6},(_,i)=>({name:'extra-'+i+'.png',bytes:image}))));
     check('more than five photos rejected',data('submissions').length===beforeOversize);
     await user('/enviar-perro',await multipart({...fields,name:'LOCAL PHOTO DOG'},[{name:'owner-original.png',bytes:image}]));
-    const photoSubmission=data('submissions').at(-1),filename=photoSubmission.photos[0];
+    const photoSubmission=data('submissions').at(-1); let filename=photoSubmission.photos[0];
     check('valid photo converted to sanitized random JPEG',photoSubmission.name==='LOCAL PHOTO DOG'&&photoSubmission.photos.length===1&&/^[a-f0-9]{20}\.jpg$/.test(filename));
     const pendingUrl='/admin/media/'+photoSubmission.id+'/'+filename;
     check('pending image never publicly accessible',(await visitor(pendingUrl)).headers.get('location')==='/admin'&&(await visitor('/media/'+photoSubmission.id+'/'+filename)).status===404);
@@ -278,6 +311,56 @@ async function run() {
     writeData('dogs',snapshotDogs);
     check('mobile admin exposes approved public sharing toolkit',(await admin('/admin?section=publicadas')).html.includes('/perro/'+published.slug+'#compartir'));
 
+
+    const originalBytes=fs.readFileSync(path.join(copy,'storage/uploads',photoSubmission.id,filename));
+    const photoEditPath='/admin/photo?dataset=submissions&id='+photoSubmission.id+'&photo='+filename;
+    check('anonymous photo editing is blocked',(await visitor(photoEditPath)).headers.get('location')==='/admin');
+    const photoEditor=await admin(photoEditPath);
+    check('photo editor supplies canvas crop and no-JS rotation controls',photoEditor.html.includes('photo-editor-canvas')&&photoEditor.html.includes('name="rotation"')&&photoEditor.html.includes('name="crop_width"')&&photoEditor.html.includes('Sin JavaScript'));
+    let currentPhoto=data('submissions').find(r=>r.id===photoSubmission.id);
+    const transformFields=()=>({dataset:'submissions',id:photoSubmission.id,photo:filename,csrf_token:adminCsrf,revision:crypto.createHash('sha256').update(JSON.stringify(currentPhoto)).digest('hex'),rotation:'90'});
+    // Use the PHP-rendered revision to preserve PHP's JSON Unicode/slash representation.
+    const photoRevision=async()=>revision((await admin('/admin/photo?dataset=submissions&id='+photoSubmission.id+'&photo='+filename)).html);
+    let photoForm={...transformFields(),revision:await photoRevision()};
+    check('photo mutation rejects missing CSRF',(await admin('/admin/photo',{...photoForm,csrf_token:'wrong'})).status===419);
+    const photoFiles=()=>fs.readdirSync(path.join(copy,'storage/uploads',photoSubmission.id)).sort();
+    const beforeFiles=photoFiles(),beforeRecord=JSON.stringify(currentPhoto);
+    for(const invalid of [{rotation:'45'},{rotation:'360'},{rotation:['90']},{crop_x:'-1',crop_y:'0',crop_width:'50',crop_height:'20'},{crop_x:'0',crop_y:'0',crop_width:'9999',crop_height:'20'},{crop_x:'1.5',crop_y:'0',crop_width:'10',crop_height:'20'},{crop_x:'0',crop_y:'0',crop_width:'0',crop_height:'20'},{crop_x:'0'},{preview_width:'120',preview_height:'80'}]) {
+      // Array payload encoded explicitly to exercise malformed input, not a stringified JS array.
+      const payload={...photoForm,...invalid};if(Array.isArray(payload.rotation)){delete payload.rotation;payload['rotation[]']='90';}
+      await admin('/admin/photo',payload);
+      check('invalid transform is rejected without file/data changes '+JSON.stringify(invalid),JSON.stringify(data('submissions').find(r=>r.id===photoSubmission.id))===beforeRecord&&JSON.stringify(photoFiles())===JSON.stringify(beforeFiles)&&fs.readFileSync(path.join(copy,'storage/uploads',photoSubmission.id,filename)).equals(originalBytes));
+    }
+    fs.mkdirSync(path.join(copy,'storage/data/transaction.json'));
+    await admin('/admin/photo',photoForm);
+    check('failed photo commit retains original and cleans all generated/partial files',JSON.stringify(photoFiles())===JSON.stringify(beforeFiles)&&fs.readFileSync(path.join(copy,'storage/uploads',photoSubmission.id,filename)).equals(originalBytes));
+    fs.rmdirSync(path.join(copy,'storage/data/transaction.json'));
+    const beforeRotate=filename;
+    const rotated=await admin('/admin/photo',photoForm);
+    currentPhoto=data('submissions').find(r=>r.id===photoSubmission.id);filename=currentPhoto.photos[0];
+    const inspectImage=bytes=>JSON.parse(execFileSync(php,[...gdArgs,'-r',"$i=imagecreatefromstring(file_get_contents('php://stdin'));$w=imagesx($i);$h=imagesy($i);$c=[];foreach([[10,10],[$w-11,10],[10,$h-11],[$w-11,$h-11]] as $p){$v=imagecolorat($i,$p[0],$p[1]);$c[]=[($v>>16)&255,($v>>8)&255,$v&255];}echo json_encode([$w,$h,$c]);"],{input:bytes,windowsHide:true}).toString());
+    const rotatedBytes=fs.readFileSync(path.join(copy,'storage/uploads',photoSubmission.id,filename)),rotatedPixels=inspectImage(rotatedBytes);
+    check('90-degree rotation atomically synchronizes source public record and dimensions',rotated.status===303&&filename!==beforeRotate&&/^[a-f0-9]{20}\.jpg$/.test(filename)&&data('dogs').find(d=>d.id===published.id).photos[0]===filename&&rotatedPixels[0]===80&&rotatedPixels[1]===120&&!fs.existsSync(path.join(copy,'storage/uploads',photoSubmission.id,beforeRotate)));
+    check('clockwise rotation preserves intended pixel orientation',rotatedPixels[2][0][2]>230&&rotatedPixels[2][1][0]>230&&rotatedPixels[2][3][1]>230);
+    check('original public photo URL is revoked after replacement',(await visitor('/media/'+published.id+'/'+beforeRotate)).status===404);
+    const staleVersion=photoForm.revision;
+    const croppedResponse=await admin('/admin/photo',{...transformFields(),revision:await photoRevision(),rotation:'0',crop_x:'5',crop_y:'10',crop_width:'60',crop_height:'90',preview_width:'80',preview_height:'120'});
+    const rotatedName=filename;currentPhoto=data('submissions').find(r=>r.id===photoSubmission.id);filename=currentPhoto.photos[0];
+    const croppedBytes=fs.readFileSync(path.join(copy,'storage/uploads',photoSubmission.id,filename)),croppedPixels=inspectImage(croppedBytes);
+    check('crop on rotated pixels re-encodes a metadata-free JPEG',croppedResponse.status===303&&croppedPixels[0]===60&&croppedPixels[1]===90&&!croppedBytes.includes(Buffer.from('Exif'))&&filename!==rotatedName&&data('dogs').find(d=>d.id===published.id).photos[0]===filename);
+    const afterCrop=JSON.stringify(currentPhoto),afterCropFiles=photoFiles();
+    await admin('/admin/photo',{...transformFields(),revision:staleVersion});
+    check('stale photo revision cannot overwrite newer crop',JSON.stringify(data('submissions').find(r=>r.id===photoSubmission.id))===afterCrop&&JSON.stringify(photoFiles())===JSON.stringify(afterCropFiles));
+    check('photo editing is audited in same dataset transaction',data('moderation').some(e=>e.action==='photo_edited'&&e.record_id===photoSubmission.id));
+    const large={...currentPhoto,id:'sub-local-large-photo',status:'pending',photos:['123456789abcdef01234.jpg']};delete large.published_dog_id;
+    const largeRows=data('submissions');largeRows.push(large);writeData('submissions',largeRows);
+    const largeDirectory=path.join(copy,'storage/uploads',large.id);fs.mkdirSync(largeDirectory);
+    const largeBytes=execFileSync(php,[...gdArgs,'-r','$i=imagecreatetruecolor(2400,1600);imagejpeg($i);imagedestroy($i);']);
+    fs.writeFileSync(path.join(largeDirectory,large.photos[0]),largeBytes);
+    const largeEditor=await admin('/admin/photo?dataset=submissions&id='+large.id+'&photo='+large.photos[0]);
+    const leftResult=await admin('/admin/photo',{csrf_token:adminCsrf,dataset:'submissions',id:large.id,photo:large.photos[0],revision:revision(largeEditor.html),rotation:'270'});
+    const largeNew=data('submissions').find(r=>r.id===large.id).photos[0],largeSize=inspectImage(fs.readFileSync(path.join(largeDirectory,largeNew)));
+    check('left rotation preserves 1800-pixel limit on legacy JPEG',leftResult.status===303&&largeSize[0]===1200&&largeSize[1]===1800&&!fs.existsSync(path.join(largeDirectory,large.photos[0])));
     await admin('/admin/edit',{...fields,dataset:'submissions',id:photoSubmission.id,csrf_token:adminCsrf,revision:revision(editor.html),name:photoSubmission.name,review_confirm:'1'});
     // Approval changed the revision: first edit must fail without deleting photos.
     check('stale photo edit preserves image',fs.existsSync(path.join(copy,'storage','uploads',photoSubmission.id,filename)));
@@ -287,6 +370,17 @@ async function run() {
     check('photo removal updates source public record and file',data('submissions').find(s=>s.id===photoSubmission.id).photos.length===0&&data('dogs').find(d=>d.id===published.id).photos.length===0&&!fs.existsSync(path.join(copy,'storage','uploads',photoSubmission.id,filename))&&(await visitor('/media/'+published.id+'/'+filename)).status===404);
   } else {
     check('missing GD shows clear rejection', (await user('/dar-perro-en-adopcion')).html.includes('habilite GD'));
+    // A tiny synthetic JPEG exercises existing-photo editing without depending on GD.
+    const jpeg=Buffer.from('/9j/4AAQSkZJRgABAQEAYABgAAD//gA+Q1JFQVRPUjogZ2QtanBlZyB2MS4wICh1c2luZyBJSkcgSlBFRyB2ODApLCBkZWZhdWx0IHF1YWxpdHkK/9sAQwAIBgYHBgUIBwcHCQkICgwUDQwLCwwZEhMPFB0aHx4dGhwcICQuJyAiLCMcHCg3KSwwMTQ0NB8nOT04MjwuMzQy/9sAQwEJCQkMCwwYDQ0YMiEcITIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIy/8AAEQgAAQABAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/aAAwDAQACEQMRAD8A+f6KKKAP/9k=','base64');
+    const rows=data('submissions'),row=rows.find(r=>r.id===submission.id),photo='0123456789abcdef0123.jpg';
+    row.photos=[photo];writeData('submissions',rows);
+    const directory=path.join(copy,'storage/uploads',row.id);fs.mkdirSync(directory,{recursive:true});fs.writeFileSync(path.join(directory,photo),jpeg);
+    const editor=await admin('/admin/photo?dataset=submissions&id='+row.id+'&photo='+photo);
+    check('missing GD disables photo editing with actionable message',editor.status===200&&editor.html.includes('sin GD')&&!editor.html.includes('class="submission-form photo-editor"'));
+    const before=JSON.stringify(data('submissions')),beforeFiles=fs.readdirSync(directory).sort();
+    const recordEditor=await admin('/admin/edit?dataset=submissions&id='+row.id);
+    await admin('/admin/photo',{csrf_token:adminCsrf,dataset:'submissions',id:row.id,photo,revision:revision(recordEditor.html),rotation:'90'});
+    check('missing GD keeps stored photos and records intact',JSON.stringify(data('submissions'))===before&&fs.readFileSync(path.join(directory,photo)).equals(jpeg)&&JSON.stringify(fs.readdirSync(directory).sort())===JSON.stringify(beforeFiles)&&(await admin('/admin/photo?dataset=submissions&id='+row.id+'&photo='+photo)).html.includes('No se pueden editar fotos sin GD'));
   }
   const tooBig=await multipart(fields,[{name:'oversize.png',bytes:Buffer.alloc(31*1024*1024)}]);
   check('post body limit gives actionable 413',(await user('/enviar-perro',tooBig)).status===413);

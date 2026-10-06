@@ -22,6 +22,8 @@ The mobile publishing/search/admin release also requires `includes/experience.ph
 
 The sharing/guide release requires includes/sharing.php, includes/guidance.php and assets/fonts (both Atkinson Hyperlegible TTF files and OFL.txt), together with the changed PHP/CSS. There is no extra backend, email, account or payment setup. GD with FreeType enables generated graphics; without it, caption/link sharing remains available. On an actual approved notice with its authorized dog photo, check /perro/{slug}#compartir, the Facebook image metadata and both Instagram downloads. Upload Instagram files manually. Facebook may retain an old preview; use its Sharing Debugger to request a fresh fetch after deployment if needed. Perro cannot recall images already copied elsewhere.
 
+The admin photo editor requires the updated includes/data.php, includes/moderation.php and CSS/JS together. GD enables rotation/cropping; without it, stored photos remain intact and the editor explains the limitation. Optional EXIF support corrects all eight JPEG orientation values, including mirrored images, before stripping metadata. Without EXIF, raw pixels are retained and the admin can rotate manually. Photo edits use replacement filenames and the existing JSON journal; retain complete images and any transaction.json during interrupted-write recovery. A crop is permanent, so preserve routine backups. Admin overview/CSV contact fields are private and come from the original submission; their inclusion does not grant public WhatsApp consent.
+
 ## Validate before reopening
 
 - Check the 14 routes in AGENTS.md over HTTPS. Verify .htaccess denies config.php, includes, tools, hidden files and Markdown documentation; storage JSON/uploads must never be directly readable. Test with an unauthenticated browser.
@@ -39,6 +41,8 @@ If the release fingerprint differs after deployment, verify the deployed revisio
 ## Local verification
 
 Run php -l on every root and includes PHP file. Run node tools/privacy-smoke.cjs; Node is only used by the development test. PERRO_PHP_BIN can select the PHP executable. If local GD is installed but disabled, PERRO_PHP_GD_DIR can point to the PHP extension directory to enable it for this test. Without GD the script verifies that photo attempts fail clearly; with GD it also tests real multipart image conversion, private review, addition/removal and publication. The test copies source into an OS temp directory and uses synthetic local fixtures. It never calls production.
+
+Set PERRO_PHP_EXIF=1 to enable an installed optional EXIF extension in the smoke runtime. Added checks cover Spanish admin labels, private CSV contacts and formula escaping, all JPEG orientation values (with/without EXIF), authenticated rotation/cropping, crop bounds, stale revisions, the 1800 px limit and cleanup after a failed commit. Run once with GD/EXIF and once without GD to verify both paths. These test environment variables do not change production PHP settings.
 
 ## Rollback and daily operation
 

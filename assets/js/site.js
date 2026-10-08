@@ -3,6 +3,7 @@
   const toggle = document.querySelector('.nav-toggle');
   const nav = document.querySelector('#site-nav');
   if (toggle && nav) {
+    document.documentElement.classList.add('nav-enhanced');
     const setOpen = function (open) {
       toggle.setAttribute('aria-expanded', String(open));
       toggle.querySelector('.sr-only').textContent = open ? 'Cerrar menú' : 'Abrir menú';
@@ -31,6 +32,9 @@
       const needed = type.value === 'lost' || type.value === 'found';
       incident.hidden = !needed;
       incident.querySelectorAll('input').forEach(function (field) { field.disabled = !needed; field.required = needed; });
+      ownerForm.querySelectorAll('[name="adoption_requirements"], [name="compatibility"], [name="reason"]').forEach(function (field) {
+        field.closest('label').hidden = needed; field.disabled = needed;
+      });
     };
     const syncAlias = function () {
       const publicName = ownerForm.querySelector('[name="name_visibility"]:checked').value === 'public';
@@ -239,5 +243,45 @@
       try { await navigator.clipboard.writeText(button.dataset.copy); if (status) status.textContent = 'Copiado.'; }
       catch (_) { if (status) status.textContent = 'Copiá este texto: ' + button.dataset.copy; }
     });
+  });
+})();
+
+(function () {
+  'use strict';
+  document.querySelectorAll('[data-native-share]').forEach(function (button) {
+    if (!navigator.share) return;
+    button.hidden = false;
+    button.addEventListener('click', async function () {
+      try { await navigator.share({title: button.dataset.shareTitle, url: button.dataset.nativeShare}); } catch (_) { /* cancellation leaves copy links available */ }
+    });
+  });
+  document.querySelectorAll('form[action="/admin/logout"]').forEach(function (form) {
+    form.addEventListener('submit', function () { try { Object.keys(sessionStorage).filter(function (item) { return item.startsWith('perro-admin-draft:'); }).forEach(function (item) { sessionStorage.removeItem(item); }); } catch (_) {} });
+  });
+  const editor = document.querySelector('[data-admin-draft]');
+  if (!editor) return;
+  // A form control named "dataset" shadows HTMLFormElement.dataset.
+  const key = 'perro-admin-draft:' + editor.getAttribute('data-admin-draft') + ':' + editor.elements.namedItem('dataset').value + ':' + editor.elements.namedItem('id').value;
+  if (editor.getAttribute('data-admin-saved') === '1') { try { sessionStorage.removeItem(key); } catch (_) {} }
+  const skip = new Set(['csrf_token', 'dataset', 'id', 'review_confirm', 'photo_authorized', 'hide_name', 'hide_whatsapp']);
+  const fields = Array.from(editor.elements).filter(function (field) { return field.name && !skip.has(field.name) && !['file', 'password', 'submit', 'button'].includes(field.type); });
+  const status = document.createElement('p'); status.className = 'notice'; status.setAttribute('role', 'status');
+  status.textContent = 'El texto del borrador se guarda en esta pestaña por hasta 4 horas. Las fotos nuevas deben seleccionarse nuevamente. Cerrá la sesión en equipos compartidos.';
+  editor.prepend(status);
+  let draft;
+  try { draft = JSON.parse(sessionStorage.getItem(key)); } catch (_) {}
+  if (draft && Date.now() - draft.at > 4 * 3600000) { sessionStorage.removeItem(key); draft = null; }
+  if (draft) {
+    const restore = document.createElement('button'); restore.type = 'button'; restore.className = 'button button-secondary'; restore.textContent = 'Recuperar borrador de esta pestaña';
+    const discard = document.createElement('button'); discard.type = 'button'; discard.className = 'button button-secondary'; discard.textContent = 'Descartar borrador';
+    status.append(document.createElement('br'), restore, discard);
+    restore.addEventListener('click', function () {
+      fields.forEach(function (field, i) { if (!draft.values[i] || draft.values[i].name !== field.name) return; if (['checkbox', 'radio'].includes(field.type)) field.checked = draft.values[i].checked; else field.value = draft.values[i].value; });
+      status.textContent = 'Borrador recuperado. Si la ficha cambió, el servidor pedirá que recargues y revises sus datos. Seleccioná las fotos nuevas nuevamente.';
+    });
+    discard.addEventListener('click', function () { sessionStorage.removeItem(key); status.textContent = 'Borrador descartado. Se muestran los datos actuales.'; });
+  }
+  editor.addEventListener('input', function () {
+    try { sessionStorage.setItem(key, JSON.stringify({at: Date.now(), values: fields.map(function (field) { return {name: field.name, value: field.value, checked: field.checked}; })})); } catch (_) { status.textContent = 'Este navegador no pudo guardar el borrador. Guardá los cambios antes de salir.'; }
   });
 })();

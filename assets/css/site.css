@@ -403,3 +403,24 @@ details[open] > summary { margin-bottom: 12px; }
   .admin-thumb { flex-basis: 72px; width: 72px; height: 80px; }
   .share-actions { align-items: stretch; flex-direction: column; }
 }
+
+.dog-card-link { display: block; height: 100%; text-decoration: none; color: inherit; }
+.dog-card-link:focus-visible { outline-offset: -4px; border-radius: var(--radius); }
+.site-footer :focus-visible, .admin-hero :focus-visible { outline-color: #fff; }
+.site-footer a { min-height: 44px; display: inline-flex; align-items: center; }
+.admin-tabs { grid-template-columns: repeat(6,minmax(0,1fr)); }
+.mobile-contact { display: none; }
+@media (max-width: 900px) {
+  html:not(.nav-enhanced) .nav-toggle { display: none; }
+  html:not(.nav-enhanced) .header-inner { flex-wrap: wrap; }
+  html:not(.nav-enhanced) .site-nav { position: static; display: flex; width: 100%; box-shadow: none; }
+  html:not(.nav-enhanced) .site-header { position: relative; }
+}
+@media (max-width: 760px) {
+  .admin-tabs { grid-template-columns: repeat(3,minmax(0,1fr)); position: static; }
+  .mobile-contact { display: block; position: fixed; inset: auto 0 0; z-index: 20; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--paper); box-shadow: 0 -2px 14px #0002; }
+  .mobile-contact .button { width: 100%; }
+  body:has(.mobile-contact) { padding-bottom: 90px; }
+  body:has(.inline-report :focus) .mobile-contact { display: none; }
+  .inline-report input, .inline-report textarea { scroll-margin-bottom: 110px; }
+}

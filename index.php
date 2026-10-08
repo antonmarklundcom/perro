@@ -11,8 +11,12 @@ require __DIR__ . '/includes/accounts.php';
 require __DIR__ . '/includes/experience.php';
 require __DIR__ . '/includes/sharing.php';
 require __DIR__ . '/includes/guidance.php';
+require __DIR__ . '/includes/workflows.php';
+require __DIR__ . '/includes/admin-panel.php';
+require __DIR__ . '/includes/operations.php';
 
 $path = request_path();
+if (method_is_post() || in_array($path, ['admin', 'activar-admin', 'dar-perro-en-adopcion', 'gracias'], true) || str_starts_with($path, 'admin/')) start_perro_session();
 if (method_is_post() && ini_bytes((string) ini_get('post_max_size')) > 0
     && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > ini_bytes((string) ini_get('post_max_size'))) {
     render_error_page('El envío es demasiado grande', 'Reducí las fotos o enviá menos archivos. El servidor rechazó el tamaño total del envío.', 413); exit;
@@ -20,6 +24,7 @@ if (method_is_post() && ini_bytes((string) ini_get('post_max_size')) > 0
 admin_edit_routes($path);
 admin_account_routes($path);
 sharing_routes($path);
+operation_routes($path);
 
 if ($path === 'robots.txt') {
     header('Content-Type: text/plain; charset=utf-8');
@@ -31,7 +36,7 @@ if ($path === 'sitemap.xml') {
     header('Content-Type: application/xml; charset=utf-8');
     echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
     echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
-    $routes = ['', 'perros', 'cachorros-en-adopcion', 'perros-de-raza-en-adopcion', 'perros-perdidos-paraguay', 'dar-perro-en-adopcion', 'centros-de-adopcion', 'como-funciona', 'seguridad', 'privacidad', 'terminos'];
+    $routes = ['', 'perros', 'cachorros-en-adopcion', 'perros-de-raza-en-adopcion', 'perros-perdidos-paraguay', 'dar-perro-en-adopcion', 'como-funciona', 'seguridad', 'privacidad', 'terminos'];
     foreach ($routes as $route) {
         echo '<url><loc>' . h(app_url($route)) . '</loc></url>';
     }
@@ -46,7 +51,7 @@ if (preg_match('#^media/([a-z0-9-]+)/([a-z0-9._-]+)$#i', $path, $matches)) {
     $dog = find_record('dogs', $matches[1]);
     $filename = basename($matches[2]);
     if (!$dog || ($dog['status'] ?? '') !== 'published'
-        || (!empty($dog['expires_at']) && strtotime((string) $dog['expires_at']) < time())
+        || (empty($dog['expires_at']) || strtotime((string) $dog['expires_at']) <= time())
         || in_array($dog['adoption_status'] ?? '', ['adopted', 'reunited'], true)
         || !in_array($filename, $dog['photos'] ?? [], true)) {
         http_response_code(404);
@@ -58,11 +63,7 @@ if (preg_match('#^media/([a-z0-9-]+)/([a-z0-9._-]+)$#i', $path, $matches)) {
         http_response_code(404);
         exit;
     }
-    header('Content-Type: ' . $details['mime']);
-    header('Cache-Control: no-store');
-    header('Content-Length: ' . filesize($file));
-    readfile($file);
-    exit;
+    serve_photo($file, false);
 }
 
 if ($path === 'enviar-perro' && method_is_post()) {
@@ -90,7 +91,7 @@ if ($path === 'enviar-perro' && method_is_post()) {
         $errors[] = 'Ingresá un correo válido.';
     }
     if ($whatsapp === '') {
-        $errors[] = 'Ingresá un WhatsApp paraguayo válido.';
+        $errors[] = 'Ingresá un celular paraguayo, por ejemplo 0981 123 456.';
     }
     foreach (['adult_confirm', 'authorized_confirm', 'photo_consent', 'terms_accept', 'no_sale_confirm'] as $confirmation) {
         if (!checked($confirmation)) {
@@ -111,13 +112,10 @@ if ($path === 'enviar-perro' && method_is_post()) {
     }
     if ($errors) {
         $_SESSION['old'] = array_filter($_POST, 'is_string');
-        set_flash('error', implode(' ', array_unique($errors)));
+        set_flash('error', implode(' ', array_unique($errors)) . ' Por seguridad, seleccioná las fotos nuevamente antes de reenviar.');
         redirect('dar-perro-en-adopcion');
     }
     $id = random_id('sub-');
-    if (!allow_public_request('submission', 20)) {
-        render_error_page('Llegaste al límite de envíos', 'Esperá una hora antes de enviar otra ficha. Si necesitás publicar varios rescates, escribinos por WhatsApp.', 429); exit;
-    }
     $record = [
         'id' => $id,
         'reference' => strtoupper(substr(str_replace('-', '', $id), -8)),
@@ -171,12 +169,18 @@ if ($path === 'enviar-perro' && method_is_post()) {
         set_flash('error', implode(' ', $photoErrors));
         redirect('dar-perro-en-adopcion');
     }
-    if (!save_record('submissions', $record)) {
+    $saveResult = save_public_record('submissions', $record, 'submission', 20);
+    if ($saveResult === 'limited') {
+        remove_upload_folder($id);
+        render_error_page('Llegaste al límite de envíos', 'Esperá una hora antes de enviar otra ficha. Si necesitás publicar varios rescates, escribinos por WhatsApp.', 429); exit;
+    }
+    if ($saveResult !== 'saved') {
         remove_upload_folder($id);
         render_error_page('No pudimos guardar el envío', 'Intentá nuevamente. Si el problema continúa, avisale a la persona administradora.', 500);
         exit;
     }
     $_SESSION['last_reference'] = $record['reference'];
+    queue_notification('submission', $record['reference']);
     unset($_SESSION['old']);
     redirect('gracias');
 }
@@ -184,23 +188,23 @@ if ($path === 'enviar-perro' && method_is_post()) {
 if ($path === 'reportar' && method_is_post()) {
     require_csrf();
     $dog = public_dog_by_slug(text('slug', 160));
-    if (!$dog || text('reason', 1000) === '') {
+    if (!$dog || text('reason', 1000) === '' || !isset(report_categories()[text('category', 30) ?: 'other'])) {
         set_flash('error', 'No pudimos registrar el reporte. Revisá el motivo e intentá otra vez.');
-        redirect('perros');
+        redirect($dog ? 'perro/' . $dog['slug'] . '#reportar' : 'perros');
     }
-    if (!allow_public_request('report', 10)) {
-        render_error_page('Llegaste al límite de reportes', 'Esperá una hora o escribile al equipo por WhatsApp.', 429); exit;
-    }
-    $saved = save_record('reports', [
+    $saved = save_public_record('reports', [
         'id' => random_id('rep-'),
         'dog_id' => $dog['id'],
         'dog_name' => $dog['name'],
+        'category' => text('category', 30) ?: 'other',
         'reason' => text('reason', 1000),
         'contact' => text('contact', 180),
         'status' => 'open',
         'created_at' => now_iso(),
-    ]);
-    if (!$saved) { render_error_page('No se guardó el reporte', 'Intentá nuevamente o escribile al equipo.', 500); exit; }
+    ], 'report', 10);
+    if ($saved === 'limited') { render_error_page('Llegaste al límite de reportes', 'Esperá una hora o escribile al equipo por WhatsApp.', 429); exit; }
+    if ($saved !== 'saved') { render_error_page('No se guardó el reporte', 'Intentá nuevamente o escribile al equipo.', 500); exit; }
+    queue_notification('report', listing_share_code($dog));
     set_flash('success', 'Recibimos el reporte. Lo vamos a revisar.');
     redirect('perro/' . $dog['slug']);
 }
@@ -209,13 +213,14 @@ if ($path === 'admin/login' && method_is_post()) {
     require_csrf();
     if (verify_admin_login(text('username', 180), password_input('password'))) {
         session_regenerate_id(true);
+        unset($_SESSION['csrf_token']);
         $_SESSION['perro_admin'] = true;
         $_SESSION['admin_started'] = $_SESSION['admin_last_seen'] = time();
         $_SESSION['admin_version'] = admin_credential_version();
         set_flash('success', 'Sesión iniciada.');
         redirect('admin');
     }
-    set_flash('error', 'Usuario o contraseña incorrectos.');
+    set_flash('error', !empty($GLOBALS['perro_login_locked']) ? 'Demasiados intentos. Esperá 15 minutos antes de volver a ingresar.' : 'Usuario o contraseña incorrectos.');
     redirect('admin');
 }
 
@@ -253,10 +258,10 @@ if ($path === 'admin/export.csv') {
     header('Content-Disposition: attachment; filename="perro-listados-' . date('Y-m-d') . '.csv"');
     $out = fopen('php://output', 'wb');
     fwrite($out, "\xEF\xBB\xBF");
-    fputcsv($out, ['ID', 'Nombre', 'Tipo', 'Estado', 'Estado de adopción o reencuentro', 'Ciudad', 'Departamento', 'Publicado', 'Vence', 'Responsable (contacto privado)', 'Correo privado', 'WhatsApp privado', 'Referencia privada del envío']);
+    fputcsv($out, ['ID', 'Nombre', 'Tipo', 'Estado', 'Estado de adopción o reencuentro', 'Ciudad', 'Departamento', 'Publicado', 'Vence', 'Responsable (contacto privado)', 'Correo privado', 'WhatsApp privado', 'Referencia privada del envío', 'Consultas (clics agregados)', 'Resultado por Perro', 'Fecha del resultado']);
     foreach (read_dataset('dogs') as $dog) {
         $contact = admin_dog_contact_record($dog);
-        fputcsv($out, array_map(static fn($value): string => preg_match('/^[\s]*[=+@-]/u', (string) $value) ? "'" . $value : (string) $value, [$dog['id'], $dog['name'], record_status_label($dog['listing_type'] ?? 'adoption'), record_status_label($dog['status'] ?? ''), record_status_label($dog['adoption_status'] ?? ''), $dog['city'], $dog['department'], $dog['published_at'], $dog['expires_at'], $contact['submitter_name'] ?? '', $contact['email'] ?? '', $contact['whatsapp'] ?? '', $contact['reference'] ?? '']));
+        fputcsv($out, array_map(static fn($value): string => preg_match('/^[\s]*[=+@-]/u', (string) $value) ? "'" . $value : (string) $value, [$dog['id'], $dog['name'], record_status_label($dog['listing_type'] ?? 'adoption'), record_status_label($dog['status'] ?? ''), record_status_label($dog['adoption_status'] ?? ''), $dog['city'], $dog['department'], $dog['published_at'], $dog['expires_at'], $contact['submitter_name'] ?? '', $contact['email'] ?? '', $contact['whatsapp'] ?? '', $contact['reference'] ?? '', $dog['contact_clicks'] ?? 0, ['yes'=>'Sí', 'no'=>'No', 'unknown'=>'No sabemos'][$dog['outcome_via_perro'] ?? 'unknown'] ?? 'No sabemos', $dog['outcome_at'] ?? '']));
     }
     fclose($out);
     exit;
@@ -287,6 +292,7 @@ if ($path === '') {
     <section class="section"><div class="shell"><div class="section-head"><div><span class="eyebrow">Fichas revisadas</span><h2>Perros que buscan hogar</h2></div><a class="text-link" href="/perros">Ver todos <span aria-hidden="true">→</span></a></div>
         <?php if ($dogs): ?><div class="dog-grid"><?php foreach ($dogs as $dog) dog_card($dog); ?></div><?php else: ?><div class="empty-state"><span class="empty-mark">P</span><h3>Las primeras historias todavía están por llegar</h3><p>Todavía no hay fichas activas. ¿Conocés un perro que necesita hogar? Enviá su aviso y el equipo lo revisará antes de publicarlo.</p><a class="button button-coral" href="/dar-perro-en-adopcion">Enviar la primera ficha</a></div><?php endif; ?>
     </div></section>
+    <section class="section section-blue"><div class="shell split-callout"><div><span class="eyebrow">Ayudemos a reunirlos</span><h2>¿Se perdió un perro o encontraste uno?</h2><p>Revisá los avisos de tu zona y compartí información para ayudarlo a volver con su responsable.</p><a class="button button-secondary" href="/perros-perdidos-paraguay">Ver perdidos y encontrados</a></div><aside><p>Si necesitás publicar un aviso, elegí “Perdido” o “Encontrado” al completar la ficha.</p><a class="text-link" href="/dar-perro-en-adopcion">Enviar un aviso →</a></aside></div></section>
     <section class="section section-blue"><div class="shell"><div class="section-head"><div><span class="eyebrow">Simple y cuidado</span><h2>Cómo funciona</h2></div></div><div class="steps"><article><span>1</span><h3>Enviás la ficha</h3><p>Contanos quién es el perro, dónde está y cómo pueden contactarte.</p></article><article><span>2</span><h3>La revisamos</h3><p>Una persona administradora verifica que esté completa y no sea una venta.</p></article><article><span>3</span><h3>Conectan con cuidado</h3><p>La persona interesada habla con el responsable y acuerdan un encuentro seguro.</p></article></div></div></section>
     <section class="section"><div class="shell split-callout"><div><span class="eyebrow">Antes de decir sí</span><h2>Adoptar es sumar una vida a la tuya</h2><p>Preguntá por salud, carácter, alimentación y rutina. Conocé al perro en un lugar seguro y nunca envíes dinero para “reservarlo”.</p><a class="text-link" href="/seguridad">Leé la guía de adopción segura <span aria-hidden="true">→</span></a></div><aside><strong>Una adopción responsable necesita:</strong><ul><li>Tiempo de adaptación</li><li>Atención veterinaria</li><li>Espacio y cuidados diarios</li><li>Compromiso para toda su vida</li></ul></aside></div></section>
     <?php
@@ -301,12 +307,17 @@ if (in_array($path, ['perros', 'cachorros-en-adopcion', 'perros-de-raza-en-adopc
 if (preg_match('#^perro/([a-z0-9-]+)$#', $path, $matches)) {
     $dog = public_dog_by_slug($matches[1]);
     if (!$dog) {
-        render_error_page('Esta ficha no está disponible', 'Puede haber vencido, sido retirada o terminado en una adopción.', 404);
-        exit;
+        $past = null;
+        foreach (read_dataset('dogs') as $candidate) if ($candidate['slug'] === $matches[1]) { $past = $candidate; break; }
+        $done = $past && in_array($past['adoption_status'], ['adopted', 'reunited'], true);
+        http_response_code($done ? 410 : 404);
+        render_header(page_meta($done ? 'Este aviso ya terminó | Perro' : 'Ficha no disponible | Perro', 'Buscá otros avisos vigentes.', $path, false));
+        echo '<section class="section"><div class="shell narrow"><h1>' . ($done ? ($past['adoption_status'] === 'adopted' ? 'Este perro ya encontró hogar' : 'Este perro volvió con su responsable') : 'Esta ficha no está disponible') . '</h1><p>Buscá otros avisos vigentes.</p><a class="button" href="/perros">Ver perros en adopción</a></div></section>';
+        render_nearby($past ?? []); render_footer(); exit;
     }
     $image = !empty($dog['photos'][0]) ? app_url('media/' . $dog['id'] . '/' . $dog['photos'][0]) : null;
     $typeLabel = listing_options()['listing_type'][$dog['listing_type']] ?? 'Adopción';
-    $meta = page_meta($dog['name'] . ', ' . $typeLabel . ' en ' . $dog['city'] . ' | Perro', 'Conocé a ' . $dog['name'] . ' en ' . $dog['city'] . ', ' . $dog['department'] . '. ' . $dog['age_group'] . ' · ' . $dog['size'] . ' · ' . $typeLabel . '.', 'perro/' . $dog['slug'], true, $image);
+    $meta = page_meta($dog['name'] . ', ' . $typeLabel . ' en ' . $dog['city'] . ' | Perro', ($dog['description'] !== '' ? preg_replace('/\s+/u', ' ', mb_substr($dog['description'], 0, 150)) : 'Conocé a ' . $dog['name'] . ' en ' . $dog['city'] . ', ' . $dog['department'] . '.'), 'perro/' . $dog['slug'], true, $image);
     // A listing without a usable photo must never inherit an illustrative dog as its preview.
     $hasSharePhoto = listing_share_has_photo($dog);
     $meta['image'] = $hasSharePhoto ? ($image ?? '') : '';
@@ -316,12 +327,15 @@ if (preg_match('#^perro/([a-z0-9-]+)$#', $path, $matches)) {
         $meta['image_width'] = 1200; $meta['image_height'] = 630; $meta['image_type'] = 'image/jpeg';
     }
     render_header($meta);
-    ?><section class="section dog-detail"><nav class="shell breadcrumbs" aria-label="Ruta de navegación"><a href="/">Inicio</a><span>›</span><a href="<?= ($dog['listing_type'] ?? 'adoption') === 'adoption' ? '/perros' : '/perros-perdidos-paraguay' ?>"><?= ($dog['listing_type'] ?? 'adoption') === 'adoption' ? 'Adopción' : 'Perdidos y encontrados' ?></a><span>›</span><span><?= h($dog['name']) ?></span></nav><div class="shell dog-detail-grid"><div class="dog-gallery"><?php if (!empty($dog['photos'])): foreach ($dog['photos'] as $index => $photo): ?><img src="/media/<?= h($dog['id']) ?>/<?= h($photo) ?>" alt="<?= h($dog['name']) ?><?= $index ? ', otra vista' : '' ?>"<?= $index ? ' loading="lazy"' : '' ?>><?php endforeach; else: ?><div class="photo-placeholder large">Foto no disponible</div><?php endif; ?></div><article class="dog-profile"><span class="eyebrow"><?= h($dog['city']) ?> · <?= h($dog['department']) ?></span><h1><?= h($dog['name']) ?></h1><?php if (($dog['public_name'] ?? false) === true && !empty($dog['contact_name'])): ?><p class="date-note">Nombre público del responsable: <?= h($dog['contact_name']) ?></p><?php endif; ?><p class="status-pill"><?= h($typeLabel) ?><?= ($dog['adoption_status'] ?? '') === 'reserved' ? ' · Reservado' : '' ?></p><?php if (($dog['listing_type'] ?? 'adoption') !== 'adoption'): ?><p><strong>Zona aproximada:</strong> <?= h($dog['last_location'] ?? '') ?><br><strong>Fecha:</strong> <?= h($dog['incident_date'] ?? '') ?></p><div class="notice">Este aviso busca reunir al perro con su responsable. No es una oferta de adopción. Verificá la relación con el perro y avisá a las autoridades competentes.</div><?php endif; ?><p class="profile-lead"><?= h($dog['description']) ?></p><dl class="facts"><div><dt>Edad</dt><dd><?= h($dog['approximate_age'] ?: $dog['age_group']) ?></dd></div><div><dt>Sexo</dt><dd><?= h($dog['sex']) ?></dd></div><div><dt>Tamaño</dt><dd><?= h($dog['size']) ?></dd></div><div><dt>Raza</dt><dd><?= h($dog['breed_label'] ?: (!empty($dog['mixed_breed']) ? 'Mestizo o raza aproximada' : 'Raza no informada')) ?></dd></div><div><dt>Vacunas</dt><dd><?= h($dog['vaccination_status'] ?: 'No informado') ?></dd></div><div><dt>Esterilización</dt><dd><?= h($dog['sterilization_status'] ?: 'No informado') ?></dd></div></dl>
+    ?><section class="section dog-detail"><nav class="shell breadcrumbs" aria-label="Ruta de navegación"><a href="/">Inicio</a><span>›</span><a href="<?= ($dog['listing_type'] ?? 'adoption') === 'adoption' ? '/perros' : '/perros-perdidos-paraguay' ?>"><?= ($dog['listing_type'] ?? 'adoption') === 'adoption' ? 'Adopción' : 'Perdidos y encontrados' ?></a><span>›</span><span><?= h($dog['name']) ?></span></nav><div class="shell dog-detail-grid"><div class="dog-gallery"><?php if (!empty($dog['photos'])): foreach ($dog['photos'] as $index => $photo): ?><img src="/media/<?= h($dog['id']) ?>/<?= h($photo) ?>" alt="<?= h($dog['name']) ?><?= $index ? ', otra vista' : '' ?>"<?= $index ? ' loading="lazy"' : '' ?>><?php endforeach; else: ?><div class="photo-placeholder large">Foto no disponible</div><?php endif; ?></div><article class="dog-profile"><span class="eyebrow"><?= h($dog['city']) ?> · <?= h($dog['department']) ?></span><h1><?= h($dog['name']) ?></h1><?php if (($dog['public_name'] ?? false) === true && !empty($dog['contact_name'])): ?><p class="date-note">Nombre público del responsable: <?= h($dog['contact_name']) ?></p><?php endif; ?><p class="status-pill"><?= h($typeLabel) ?><?= ($dog['adoption_status'] ?? '') === 'reserved' ? ' · Reservado' : '' ?></p><?php if (($dog['listing_type'] ?? 'adoption') !== 'adoption'): ?><p><strong>Zona aproximada:</strong> <?= h($dog['last_location'] ?? '') ?><br><strong>Fecha:</strong> <?= h(format_date($dog['incident_date'] ?? '')) ?></p><div class="notice">Este aviso busca reunir al perro con su responsable. No es una oferta de adopción. Verificá la relación con el perro y avisá a las autoridades competentes.</div><?php endif; ?><p class="profile-lead"><?= h($dog['description']) ?></p><dl class="facts"><div><dt>Edad</dt><dd><?= h($dog['approximate_age'] ?: $dog['age_group']) ?></dd></div><div><dt>Sexo</dt><dd><?= h($dog['sex']) ?></dd></div><div><dt>Tamaño</dt><dd><?= h($dog['size']) ?></dd></div><div><dt>Raza</dt><dd><?= h($dog['breed_label'] ?: (!empty($dog['mixed_breed']) ? 'Mestizo o raza aproximada' : 'Raza no informada')) ?></dd></div><?php if ($dog['listing_type'] === 'adoption'): ?><div><dt>Vacunas</dt><dd><?= h($dog['vaccination_status'] ?: 'No informado') ?></dd></div><div><dt>Esterilización</dt><dd><?= h($dog['sterilization_status'] ?: 'No informado') ?></dd></div><?php endif; ?></dl>
     <?php if ($dog['compatibility']): ?><h2>Compatibilidad conocida</h2><p><?= nl2br(h($dog['compatibility'])) ?></p><?php endif; ?><?php if ($dog['health_information']): ?><h2>Información de salud</h2><p><?= nl2br(h($dog['health_information'])) ?></p><small>Información declarada por la persona responsable; verificá con un profesional veterinario.</small><?php endif; ?><?php if ($dog['adoption_requirements']): ?><h2>Lo que busca su responsable</h2><p><?= nl2br(h($dog['adoption_requirements'])) ?></p><?php endif; ?>
-    <div class="profile-actions"><?php if (!empty($dog['contact_whatsapp'])): $msg = rawurlencode('Hola, vi el aviso de ' . $dog['name'] . ' (' . $typeLabel . ') en Perro y quisiera aportar o consultar información.'); ?><a class="button button-whatsapp" href="https://wa.me/<?= h($dog['contact_whatsapp']) ?>?text=<?= h($msg) ?>" rel="noopener noreferrer">Consultar por WhatsApp</a><?php else: ?><a class="button button-whatsapp" href="<?= h(project_whatsapp_url()) ?>" rel="noopener noreferrer">Consultar al equipo de Perro</a><p>El contacto del responsable permanece privado.</p><?php endif; ?></div><p><a class="text-link" href="#compartir">Compartí este aviso →</a></p><p class="date-note">Publicada el <?= h(date('d/m/Y', strtotime($dog['published_at']))) ?> · Última confirmación <?= h(date('d/m/Y', strtotime($dog['last_confirmed_at']))) ?></p></article></div></section>
+    <div class="profile-actions"><a class="button button-whatsapp" href="/contactar/<?= h($dog['slug']) ?>" rel="noopener noreferrer"><?= $dog['contact_whatsapp'] !== '' ? 'Consultar por WhatsApp' : 'Consultar al equipo de Perro' ?></a><?php if ($dog['contact_whatsapp'] === ''): ?><p>El contacto del responsable permanece privado. <a class="text-link" href="<?= h(project_whatsapp_url(enquiry_message($dog))) ?>">WhatsApp del equipo</a></p><?php endif; ?></div>
+    <?php if ($dog['listing_type'] === 'adoption'): ?><p class="notice">La adopción es gratuita: no pagues para reservar. Conocé al perro en un lugar seguro. <a href="/seguridad">Guía de adopción segura →</a></p><?php endif; ?>
+    <?php if ($dog['adoption_status'] === 'reserved'): ?><p>Reservado: alguien está en conversación; podés consultar igual.</p><?php endif; ?>
+    <aside class="mobile-contact"><a class="button button-whatsapp" href="/contactar/<?= h($dog['slug']) ?>">Consultar por WhatsApp</a></aside><p><a class="text-link" href="#compartir">Compartí este aviso →</a></p><p class="date-note">Publicada el <?= h(format_date($dog['published_at'])) ?> · Última confirmación <?= h(format_date($dog['last_confirmed_at'])) ?></p></article></div></section>
     <?php render_listing_sharing($dog); ?>
-    <section class="section section-note"><div class="shell narrow"><h2>¿Hay algo incorrecto en esta ficha?</h2><form class="inline-report" method="post" action="/reportar"><?= csrf_field() ?><input type="hidden" name="slug" value="<?= h($dog['slug']) ?>"><label>Motivo<textarea name="reason" required maxlength="1000" placeholder="Contanos qué debería revisar la administración"></textarea></label><label>Tu contacto (opcional)<input name="contact" maxlength="180"></label><button class="button button-small button-secondary" type="submit">Enviar reporte</button></form></div></section>
-    <?php render_footer(); exit;
+    <section class="section section-note"><div class="shell narrow" id="reportar"><h2>¿Hay algo incorrecto en esta ficha?</h2><form class="inline-report" method="post" action="/reportar"><?= csrf_field() ?><input type="hidden" name="slug" value="<?= h($dog['slug']) ?>"><label>Categoría<select name="category"><?php select_options(report_categories()); ?></select></label><label>Motivo<textarea name="reason" required maxlength="1000" placeholder="Contanos qué debería revisar la administración"></textarea></label><label>Tu contacto (opcional)<input name="contact" maxlength="180"></label><button class="button button-small button-secondary" type="submit">Enviar reporte</button></form></div></section>
+    <?php render_nearby($dog); render_footer(); exit;
 }
 
 if ($path === 'dar-perro-en-adopcion') {
@@ -391,7 +405,7 @@ $contentPages = array_replace($contentPages, legal_pages());
 
 if (isset($contentPages[$path])) {
     [$title, $description, $html] = $contentPages[$path];
-    render_header(page_meta($title . ' | Perro', $description, $path));
+    render_header(page_meta($title . ' | Perro', $description, $path, $path !== 'centros-de-adopcion'));
     ?><section class="page-hero compact"><div class="shell"><span class="eyebrow">Perro · Paraguay</span><h1><?= h($title) ?></h1><p><?= h($description) ?></p></div></section><section class="section"><article class="shell prose"><?= $html ?></article></section><?php
     render_footer(); exit;
 }

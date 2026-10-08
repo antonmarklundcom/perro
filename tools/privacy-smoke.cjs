@@ -23,6 +23,7 @@ async function run() {
   const password=crypto.randomBytes(24).toString('base64url');
   const php=process.env.PERRO_PHP_BIN || 'php';
   const gdArgs=process.env.PERRO_PHP_GD_DIR ? ['-d','extension_dir='+process.env.PERRO_PHP_GD_DIR,'-d','extension=gd'] : [];
+  if(process.env.PERRO_PHP_DISABLE_GD === '1') gdArgs.push('-d','disable_functions=imagecreatefromstring,imagecreatetruecolor,imagejpeg,imagettftext,imagettfbbox');
   if(process.env.PERRO_PHP_EXIF === '1') gdArgs.push('-d','extension=exif');
   processHandle=spawn(php,[...gdArgs,'-d','upload_max_filesize=5M','-d','post_max_size=30M','-d','memory_limit=128M','-S','127.0.0.1:'+port,'router.php'],{
     cwd:copy, windowsHide:true, env:{...process.env,
@@ -40,6 +41,7 @@ async function run() {
   const user=session(),admin=session(),visitor=session();
   let ready=false;
   for(let i=0;i<50;i++) { try { await visitor('/'); ready=true;break; } catch { if(startupError) throw startupError; await new Promise(r=>setTimeout(r,100)); } }
+  if(!ready) throw Error('Preview did not start: '+(startupError||logs));
   check('isolated preview starts',ready);
   const routes=['/','/perros','/dar-perro-en-adopcion','/perros-perdidos-paraguay','/como-funciona','/centros-de-adopcion','/seguridad','/terminos','/privacidad','/cachorros-en-adopcion','/perros-de-raza-en-adopcion','/admin','/robots.txt','/sitemap.xml'];
   for(const route of routes) check('route '+route,(await visitor(route)).status===200);
@@ -136,7 +138,7 @@ async function run() {
   check('all search words match across fields',(await visitor('/perros?q=LOCAL%20asuncion')).html.includes(firstDog.name));
   check('array-shaped queries fail safely',(await visitor('/perros?city[]=Luque&sex[]=Macho')).status===200);
   check('removable filters and real location suggestions present',filteredPage.html.includes('aria-label="Quitar filtros"')&&filteredPage.html.includes('id="ciudades"')&&filteredPage.html.includes('value="Encarnación"'));
-  fixtures[0].published_at='2026-09-01T12:00:00-03:00'; fixtures[1].published_at='2026-09-01T14:30:00Z';writeData('dogs',[...baselineDogs,...fixtures]);
+  fixtures[0].published_at='2026-09-01T12:00:00-03:00'; fixtures[1].published_at='2026-09-01T14:30:00Z';fixtures[1].adoption_status='available';writeData('dogs',[...baselineDogs,...fixtures]);
   const timezoneSort=await visitor('/perros?sort=oldest');
   check('date ordering compares instants across timezones',timezoneSort.html.indexOf('LOCAL SEARCH 01')<timezoneSort.html.indexOf('LOCAL SEARCH 00'));
   writeData('dogs',baselineDogs);
@@ -144,7 +146,7 @@ async function run() {
   check('profile has truthful breadcrumb schema without commerce',breadcrumb['@type']==='BreadcrumbList'&&breadcrumb.itemListElement.at(-1).name===firstDog.name&&!profile.html.includes('"@type":"Product"'));
   check('profile has share and copy actions',profile.html.includes('Compartir por WhatsApp')&&profile.html.includes('data-copy="https://perro.com.py/perro/'+firstDog.slug+'"'));
   const defaultPanel=await admin('/admin');
-  check('admin defaults to pending review with separate sections',defaultPanel.html.includes('<option value="pending" selected>')&&defaultPanel.html.includes('id="publicadas" hidden'));
+  check('admin defaults to pending review with separate sections',defaultPanel.html.includes('<option value="pending" selected>')&&!defaultPanel.html.includes('id="publicadas"')&&(await admin('/admin?section=publicadas')).html.includes('id="publicadas"'));
   const reviewedPanel=await admin('/admin?queue=approved');
   check('WhatsApp publication message contains approved public URL',decodeURIComponent(reviewedPanel.html).includes('Tu aviso ya está publicado: https://perro.com.py/perro/'+firstDog.slug));
   check('WhatsApp tools cover photos and renewal',defaultPanel.html.includes('Pedir fotos')&&defaultPanel.html.includes('Confirmar vigencia'));
@@ -155,9 +157,9 @@ async function run() {
   check('search size is optional',!/<select name="size" required/.test(cityResults.html));
   check('selected search size retained',(await visitor('/perros?size=Mediano')).html.includes('<option value="Mediano" selected>'));
   check('text search accepts upper case and missing accents',(await visitor('/perros?q=ASUNCION')).html.includes(firstDog.name));
-  check('nonmatching search excludes listing',!(await visitor('/perros?city=Encarnacion')).html.includes(firstDog.name));
-  const queueHtml=(await admin('/admin?queue=approved')).html.split('id="solicitudes"')[1].split('id="publicadas"')[0];
-  const pendingHtml=(await admin('/admin?queue=pending')).html.split('id="solicitudes"')[1].split('id="publicadas"')[0];
+  check('nonmatching search has zero matching listings',(await visitor('/perros?city=Encarnacion')).html.includes('No encontramos fichas con esos filtros'));
+  const queueHtml=(await admin('/admin?queue=approved')).html.split('id="solicitudes"')[1].split('</main>')[0];
+  const pendingHtml=(await admin('/admin?queue=pending')).html.split('id="solicitudes"')[1].split('</main>')[0];
   check('admin status filter includes only requested submissions',queueHtml.includes(firstDog.name)&&!pendingHtml.includes(firstDog.name));
   await Promise.all([approve(submission.id),approve(submission.id)]);
   check('duplicate and concurrent approval creates exactly one dog',data('dogs').length===1&&data('dogs')[0].id===firstDog.id);
@@ -166,7 +168,7 @@ async function run() {
   await user('/enviar-perro',{...fields,name:'OPT IN DOG',name_visibility:'public',public_display_name:'PUBLIC ALIAS <img src=x>',public_whatsapp:'1'});
   dog=await approve(data('submissions').at(-1).id); profile=await visitor('/perro/'+dog.slug);
   check('admin consent explains permission to display publicly',(await admin('/admin?queue=all')).html.includes('Autorizó mostrar su WhatsApp en la ficha pública'));
-  check('separate name and WhatsApp opt-in works',profile.html.includes('PUBLIC ALIAS &lt;img src=x&gt;')&&profile.html.includes('https://wa.me/595981999999'));
+  check('separate name and WhatsApp opt-in works',profile.html.includes('PUBLIC ALIAS &lt;img src=x&gt;')&&(await visitor('/contactar/'+dog.slug)).headers.get('location').startsWith('https://wa.me/595981999999'));
   check('full name stays private even with public alias',!profile.html.includes(fields.submitter_name));
   const optInSubmission=data('submissions').at(-1), optInDog=dog;
   const editUrl='/admin/edit?dataset=submissions&id='+optInSubmission.id;
@@ -186,7 +188,7 @@ async function run() {
   check('stale concurrent edits rejected',data('dogs').find(d=>d.id===optInDog.id).name===editFields.name);
   async function state(id,action,extra={}) { return admin('/admin/action',{csrf_token:adminCsrf,dataset:'dogs',id,action,...extra}); }
   await state(firstDog.id,'adopted');
-  check('adopted dog removed from search detail and sitemap',!(await visitor('/perros')).html.includes(firstDog.name)&&(await visitor('/perro/'+firstDog.slug)).status===404&&!(await visitor('/sitemap.xml')).html.includes(firstDog.slug));
+  check('adopted dog removed from search and sitemap; old URL explains outcome',!(await visitor('/perros')).html.includes(firstDog.name)&&(await visitor('/perro/'+firstDog.slug)).status===410&&!(await visitor('/sitemap.xml')).html.includes(firstDog.slug));
   await state(firstDog.id,'available');
   check('renewal requires owner confirmation',data('dogs').find(d=>d.id===firstDog.id).adoption_status==='adopted');
   await state(firstDog.id,'available',{owner_confirmed:'1'});
@@ -204,15 +206,15 @@ async function run() {
   await state(firstDog.id,'available',{owner_confirmed:'1'});
   await user('/enviar-perro',{...fields,name:'LOCAL LOST DOG',listing_type:'lost',age_group:'No se sabe',size:'No se sabe',last_location:'Zona aproximada LOCAL',incident_date:'2026-10-01'});
   const lost=await approve(data('submissions').at(-1).id),lostProfile=await visitor('/perro/'+lost.slug);
-  check('lost profile uses recovery context and incident facts',lostProfile.html.includes('Perro perdido')&&lostProfile.html.includes('2026-10-01')&&lostProfile.html.includes('Zona aproximada LOCAL')&&!lostProfile.html.includes('sobre su adopción responsable'));
+  check('lost profile uses recovery context and incident facts',lostProfile.html.includes('Perro perdido')&&lostProfile.html.includes('01/10/2026')&&lostProfile.html.includes('Zona aproximada LOCAL')&&!lostProfile.html.includes('sobre su adopción responsable'));
   check('lost dog appears only in recovery listings',(await visitor('/perros-perdidos-paraguay')).html.includes(lost.name)&&!(await visitor('/perros')).html.includes(lost.name));
   check('lost search combines type city and sex',(await visitor('/perros-perdidos-paraguay?type=lost&city=asuncion&sex=Macho')).html.includes(lost.name));
-  check('recovery listing can be found by its public code',(await visitor('/perros-perdidos-paraguay?q='+lost.slug.split('-').at(-1))).html.includes('<h2><a href="/perro/'+lost.slug+'">'));
+  check('recovery listing can be found by its public code',(await visitor('/perros-perdidos-paraguay?q='+lost.slug.split('-').at(-1))).html.includes('href="/perro/'+lost.slug+'"'));
   check('found filter excludes lost dogs',!(await visitor('/perros-perdidos-paraguay?type=found')).html.includes(lost.name));
   await state(lost.id,'adopted');
   check('lost listing cannot be marked adopted',data('dogs').find(d=>d.id===lost.id).adoption_status==='available');
   await state(lost.id,'reunited');
-  check('reunited listing removed from active recovery page',!(await visitor('/perros-perdidos-paraguay')).html.includes(lost.name)&&(await visitor('/perro/'+lost.slug)).status===404);
+  check('reunited listing removed from active recovery page',!(await visitor('/perros-perdidos-paraguay')).html.includes(lost.name)&&(await visitor('/perro/'+lost.slug)).status===410);
   profile=await visitor('/perro/'+firstDog.slug);
   await visitor('/reportar',{csrf_token:token(profile.html),slug:firstDog.slug,reason:'LOCAL TEST REPORT',contact:'LOCAL REPORT CONTACT'});
   check('public report persists privately',data('reports').at(-1).reason==='LOCAL TEST REPORT');
@@ -226,8 +228,8 @@ async function run() {
   const imageDir=path.join(copy,'storage','uploads',dogs[0].source_submission_id); fs.mkdirSync(imageDir,{recursive:true});fs.writeFileSync(path.join(imageDir,'audit.png'),png);
   dogs[0].photos=['audit.png'];writeData('dogs',dogs);
   let photo=await visitor('/media/'+dogs[0].id+'/audit.png');
-  check('published photos use no-store',photo.status===200&&photo.headers.get('cache-control')==='no-store');
-  if(!process.env.PERRO_PHP_GD_DIR) {
+  check('published photos revalidate private cached pixels',photo.status===200&&photo.headers.get('cache-control').includes('private, no-cache')&&!!photo.headers.get('etag'));
+  if(!form.html.includes('name="photos[]"')) {
     const plainShare=await visitor('/perro/'+dogs[0].slug);
     check('no-GD sharing still offers caption and original photo preview',plainShare.html.includes('Copiar texto')&&plainShare.html.includes('media/'+dogs[0].id+'/audit.png')&&!plainShare.html.includes('Descargar imagen para historia'));
     check('no-GD generated image fails gracefully',(await visitor('/compartir/'+dogs[0].slug+'/post.jpg')).status===503);
@@ -287,7 +289,7 @@ async function run() {
     const ogPath=new URL(ogUrl).pathname+new URL(ogUrl).search;
     check('Facebook preview uses generated real-photo card',ogPath.includes('/compartir/'+published.slug+'/facebook.jpg')&&sharedProfile.html.includes('og:image:width" content="1200"')&&sharedProfile.html.includes('og:image:height" content="630"'));
     check('sharing caption excludes all private owner fields',![fields.submitter_name,fields.email,'595981999999',fields.public_display_name,photoSubmission.reference].some(value=>sharedProfile.html.includes(value)));
-    check('public code on Instagram image can find the approved listing',(await visitor('/perros?q='+published.slug.split('-').at(-1))).html.includes('<h2><a href="/perro/'+published.slug+'">'));
+    check('public code on Instagram image can find the approved listing',(await visitor('/perros?q='+published.slug.split('-').at(-1))).html.includes('href="/perro/'+published.slug+'"'));
     const snapshotDogs=data('dogs');
     for(const [format,width,height] of [['facebook',1200,630],['post',1080,1080],['story',1080,1920]]) {
       const graphic=await visitor('/compartir/'+published.slug+'/'+format+'.jpg?download=1');

@@ -1,0 +1,36 @@
+name: PHP and local regression checks
+on:
+  pull_request:
+    paths:
+      - '**.php'
+      - 'assets/**'
+      - 'tools/**'
+      - '.htaccess'
+      - '.github/workflows/checks.yml'
+permissions:
+  contents: read
+concurrency:
+  group: perro-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: gd, exif, zip
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: PHP syntax
+        run: find . -name '*.php' -not -path './storage/*' -print0 | xargs -0 -n1 php -l
+      - name: Regression checks without images
+        run: PERRO_PHP_DISABLE_GD=1 node tools/privacy-smoke.cjs
+      - name: Regression checks with images
+        run: node tools/privacy-smoke.cjs
+      - name: Audit regression checks
+        run: node tools/audit-smoke.cjs

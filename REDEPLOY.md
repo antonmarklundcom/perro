@@ -49,3 +49,10 @@ Set PERRO_PHP_EXIF=1 to enable an installed optional EXIF extension in the smoke
 Stop writes before reverting code. Preserve current private data and photos. If transaction.json exists, let the new release complete recovery first; do not delete it to hide an error. Restore a full storage backup only after considering legitimate records received since that backup. Check functionality before reopening.
 
 The team reviews the admin queue and reports daily, verifies listings with owners, sends follow-up messages manually using WhatsApp templates, and handles correction/deletion requests. Keep automated hosting backups and test restoration. Payment collection and donor lists are not enabled; decide recipient identity, accounting, budget transparency and separate opt-in recognition before adding fundraising.
+
+
+## Auditoría 2026-10-07
+
+Incluí includes/workflows.php, includes/admin-panel.php, includes/operations.php y assets/images/default-preview.jpg junto al resto de la misma revisión. La reescritura Apache ahora usa la URL real y elimina la consulta path. No requiere migración de base de datos: los nuevos archivos privados archive.json y notifications.json se inicializan sin reemplazar registros existentes. Para cambios de reglas, seguí las listas de compatibilidad de LEGAL-RELEASE.md.
+
+OPERATIONS.md contiene las instrucciones para las alertas opcionales, crons privados, respaldo ZIP, archivo, variantes y verificación de la huella/CSP/HSTS. Activar esos servicios necesita configuración real; desplegar los archivos no envía correos ni activa crons. Conservá storage, ajustes y credenciales.

@@ -195,8 +195,17 @@ function sharing_routes(string $path): void
     $photo = $dog ? listing_share_photo($dog) : null;
     if (!$dog || !$photo) $error(404, 'Imagen no disponible.');
     if (!sharing_available()) $error(503, 'La imagen para compartir no está disponible. Podés compartir el enlace de la ficha.');
-    $image = sharing_image($dog, $photo, $matches[2]);
+    $cacheKey = hash('sha256', json_encode(listing_share_fields($dog)) . $matches[2] . hash_file('sha256', $photo['path']) . perro_release_id());
+    $cacheDir = PERRO_STORAGE . '/cache';
+    if (!is_dir($cacheDir)) @mkdir($cacheDir, 0755, true);
+    $cacheFile = $cacheDir . '/share-' . $cacheKey . '.jpg';
+    $image = is_file($cacheFile) ? file_get_contents($cacheFile) : sharing_image($dog, $photo, $matches[2]);
     if ($image === null) $error(503, 'No pudimos preparar la imagen. Podés compartir el enlace de la ficha.');
+    if (!is_file($cacheFile)) {
+        $temp = $cacheFile . '.tmp-' . bin2hex(random_bytes(4));
+        if (@file_put_contents($temp, $image, LOCK_EX) !== false) @rename($temp, $cacheFile);
+        @unlink($temp);
+    }
     header('Content-Type: image/jpeg');
     header('Content-Length: ' . strlen($image));
     if (($_GET['download'] ?? '') === '1') {
@@ -220,6 +229,7 @@ function render_listing_sharing(array $dog): void
         <h2 id="sharing-title">Compartí esta ficha</h2>
         <p><?= ($dog['listing_type'] ?? 'adoption') === 'adoption' ? 'Compartir es voluntario y puede ayudar a encontrar una familia. La adopción es gratuita.' : 'Podés compartir el aviso para ayudar a difundirlo.' ?></p>
         <div class="button-row">
+            <button class="button button-secondary" type="button" data-native-share="<?= h($url) ?>" data-share-title="<?= h($fields['name']) ?>" hidden>Compartir desde el celular</button>
             <a class="button button-secondary" href="<?= h('https://www.facebook.com/sharer/sharer.php?u=' . rawurlencode($url)) ?>" target="_blank" rel="noopener noreferrer">Compartir en Facebook</a>
             <a class="button button-whatsapp" href="<?= h('https://wa.me/?text=' . rawurlencode($caption)) ?>" target="_blank" rel="noopener noreferrer">Compartir por WhatsApp</a>
         </div>
@@ -227,13 +237,14 @@ function render_listing_sharing(array $dog): void
         <label for="sharing-caption">Texto para acompañar la publicación</label>
         <textarea id="sharing-caption" class="share-caption" rows="6" readonly><?= h($caption) ?></textarea>
         <div class="button-row"><button class="button button-secondary" type="button" data-copy="<?= h($caption) ?>">Copiar texto</button><button class="button button-secondary" type="button" data-copy="<?= h($url) ?>">Copiar enlace</button><span class="copy-status" role="status" aria-live="polite"></span></div>
-        <h3>Para Instagram</h3>
-        <p>La imagen incluye el código público de ficha <strong><?= h($code) ?></strong>. Podés encontrarla en <a href="<?= h(app_url($searchPath) . '?q=' . rawurlencode($code)) ?>">el buscador de Perro</a>. Este código público es distinto de tu referencia privada de envío.</p>
+        <details><summary>Imágenes y opciones para Instagram</summary><h3>Para Instagram</h3>
+        <p>La imagen incluye el código público <strong><?= h($code) ?></strong>. <a href="/ficha/<?= h($code) ?>">Abrí la ficha por su código</a> o buscala en Perro.</p>
         <?php if ($images): ?>
         <div class="button-row"><a class="button button-secondary" href="<?= h(listing_share_image_url($dog, 'post') . '&download=1') ?>" download>Descargar imagen para publicación</a><a class="button button-secondary" href="<?= h(listing_share_image_url($dog, 'story') . '&download=1') ?>" download>Descargar imagen para historia</a></div>
         <p>Descargá la imagen y subila manualmente en Instagram. Pegá el texto en la descripción; el enlace escrito allí puede no ser clicable. Para una historia, agregá un sticker de enlace con la URL directa de esta ficha.</p>
         <?php else: ?><p>No hay una imagen para descargar en este momento. Podés copiar el texto y el enlace. Si tenés una foto real con permiso para publicarla, subila manualmente y agregá el enlace directo de esta ficha; en historias, usá el sticker de enlace.</p><?php endif; ?>
         <p class="field-help">Las imágenes descargadas y las vistas previas de otras plataformas pueden no actualizarse cuando cambia el aviso. Revisá siempre el estado actual en <a href="<?= h($url) ?>">la ficha</a> antes de compartir.</p>
+        </details>
     </div></section>
     <?php
 }

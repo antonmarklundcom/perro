@@ -64,8 +64,8 @@ function policy_accepted(array $record): bool
     foreach (['adult_confirm', 'authorized_confirm', 'photo_consent', 'no_sale_confirm'] as $key) {
         if (($consents[$key] ?? false) !== true) return false;
     }
-    return ($consents['terms_version'] ?? '') === PERRO_TERMS_VERSION
-        && ($consents['privacy_version'] ?? '') === PERRO_PRIVACY_VERSION;
+    return in_array($consents['terms_version'] ?? '', array_unique([PERRO_TERMS_VERSION, ...PERRO_COMPATIBLE_TERMS]), true)
+        && in_array($consents['privacy_version'] ?? '', array_unique([PERRO_PRIVACY_VERSION, ...PERRO_COMPATIBLE_PRIVACY]), true);
 }
 
 function moderate_record(string $dataset, string $id, string $action): array
@@ -110,7 +110,10 @@ function moderate_record(string $dataset, string $id, string $action): array
         if ($dataset === 'submissions' && $action === 'reject') {
             if (($record['status'] ?? '') !== 'pending') return ['error', 'Solo se pueden rechazar solicitudes pendientes.'];
             $record['status'] = 'rejected';
-            $record['internal_note'] = text('note', 1000);
+            if (text('note', 1000) !== '') $record['internal_note'] = trim(($record['internal_note'] ?? '') . "\n" . date('d/m/Y') . ': ' . text('note', 1000));
+        } elseif ($dataset === 'submissions' && $action === 'reopen') {
+            if ($record['status'] !== 'rejected') return ['error', 'Solo se pueden reabrir solicitudes rechazadas.'];
+            $record['status'] = 'pending';
         } elseif ($dataset === 'dogs' && in_array($action, ['available', 'reserved', 'adopted', 'reunited', 'expired', 'unpublish'], true)) {
             $type = $record['listing_type'] ?? 'adoption';
             if (($type !== 'adoption' && in_array($action, ['adopted', 'reserved'], true)) || ($type === 'adoption' && $action === 'reunited')) {
@@ -126,19 +129,27 @@ function moderate_record(string $dataset, string $id, string $action): array
                 $record['status'] = $action === 'expired' ? 'expired' : 'removed';
             } else {
                 $record['adoption_status'] = $action;
+                $record['status_changed_at'] = now_iso();
+                if (in_array($action, ['adopted', 'reunited'], true)) {
+                    $record['outcome_at'] = now_iso();
+                    $record['outcome_via_perro'] = in_array(text('outcome_via_perro'), ['yes', 'no', 'unknown'], true) ? text('outcome_via_perro') : 'unknown';
+                }
             }
         } elseif ($dataset === 'reports' && $action === 'resolve') {
             $record['status'] = 'resolved';
+            $record['resolution_note'] = text('note', 1000);
+            $record['resolved_at'] = now_iso();
         } else return ['error', 'La acción solicitada no está disponible.'];
         $record['updated_at'] = now_iso();
         if (!save_record($dataset, $record)) return ['error', 'No se pudo guardar el cambio.'];
         record_moderation($action, $id, $record['internal_note'] ?? '');
-        return ['success', 'Cambio guardado.'];
+        return ['success', match ($action) { 'reject'=>'Solicitud rechazada; se conserva la nota.', 'reopen'=>'Solicitud reabierta para revisión.', 'resolve'=>'Reporte revisado.', 'available'=>'Aviso renovado después de confirmar su vigencia.', default=>'Estado actualizado.' }];
     });
 }
 
 function record_revision(array $record): string
 {
+    unset($record['contact_clicks']);
     return hash('sha256', (string) json_encode($record));
 }
 
@@ -229,7 +240,8 @@ function edit_admin_photo(string $dataset, string $id, string $photo): array
                 throw $error;
             }
             $retain = true;
-            @unlink($file['path']);
+            prepare_photo_variants($destination);
+            delete_photo_files($file['path']);
             return ['success', 'Foto guardada. El giro y el recorte se aplicaron a la ficha.', $filename];
         } finally {
             imagedestroy($source);
@@ -285,10 +297,7 @@ function admin_edit_routes(string $path): void
         $file = $record ? PERRO_UPLOADS . '/' . basename($record['source_submission_id'] ?? $record['id']) . '/' . basename($matches[2]) : '';
         $details = $record && in_array($matches[2], $record['photos'] ?? [], true) && is_file($file) ? @getimagesize($file) : false;
         if (!$details) { http_response_code(404); exit; }
-        header('Content-Type: ' . $details['mime']);
-        header('Cache-Control: no-store');
-        readfile($file);
-        exit;
+        serve_photo($file, true);
     }
     if ($path !== 'admin/edit') return;
     require_admin();
@@ -304,6 +313,7 @@ function admin_edit_routes(string $path): void
     }
     if (method_is_post()) {
         $errors = listing_input_errors();
+        if ($dataset === 'submissions' && text('whatsapp', 40) !== '' && valid_whatsapp(text('whatsapp', 40)) === '') $errors[] = 'Ingresá un celular paraguayo, por ejemplo 0981 123 456.';
         if (!checked('review_confirm')) $errors[] = 'Confirmá que revisaste los cambios y su autorización.';
         if (!$errors) {
             $result = with_data_lock(static function () use ($dataset, $id): array {
@@ -317,6 +327,7 @@ function admin_edit_routes(string $path): void
                 foreach (listing_fields() as $key => $limit) $new[$key] = text($key, $limit);
                 $new['mixed_breed'] = checked('mixed_breed');
                 $new['internal_note'] = text('internal_note', 1500);
+                if ($dataset === 'submissions' && text('whatsapp', 40) !== '') $new['whatsapp'] = valid_whatsapp(text('whatsapp', 40));
                 $new['updated_at'] = now_iso();
                 // Administrators can revoke permissions, but cannot invent an
                 // owner's consent or replace their chosen public alias.
@@ -372,25 +383,29 @@ function admin_edit_routes(string $path): void
                     foreach ($newPhotos as $photo) @unlink($folder . '/' . $photo);
                     return ['error', 'No se pudo guardar la edición.'];
                 }
-                foreach (array_diff($current['photos'] ?? [], $new['photos']) as $photo) @unlink($folder . '/' . basename($photo));
-                record_moderation('edited', $id, $new['internal_note']);
-                return ['success', 'Ficha corregida. Cambiar el tipo retira el aviso: confirmá la situación con el responsable antes de renovarlo.'];
+                foreach (array_diff($current['photos'] ?? [], $new['photos']) as $photo) delete_photo_files($folder . '/' . basename($photo));
+                record_moderation('edited', $id);
+                if ($dataset === 'submissions' && ($current['whatsapp'] ?? '') !== ($new['whatsapp'] ?? '')) record_moderation('private_contact_corrected', $id);
+                return ['success', $current['listing_type'] !== $new['listing_type'] ? 'Ficha corregida. El cambio de tipo retiró el aviso; confirmá su situación antes de renovarlo.' : 'Ficha corregida.'];
             });
             set_flash($result[0], $result[1]);
-            if ($result[0] === 'success') redirect('admin');
+            if ($result[0] === 'success') redirect('admin/edit?dataset=' . $dataset . '&id=' . rawurlencode($id) . (admin_context_query() !== '' ? '&' . admin_context_query() : ''));
         } else set_flash('error', implode(' ', $errors));
         // Preserve submitted text after validation failure without weakening the
         // saved revision or auto-selecting new publication permissions.
         foreach (listing_fields() as $key => $limit) $record[$key] = text($key, $limit);
     }
-    $revisionRecord = find_record($dataset, $id);
+    // Keep the submitted revision after every failed save. Repeated stale saves
+    // must keep failing until the administrator deliberately reloads current data.
+    $revision = method_is_post() ? text('revision', 100) : record_revision($record);
     render_header(page_meta('Revisar y editar ficha | Perro', 'Revisión privada de la ficha.', 'admin/edit', false));
     ?>
-    <section class="section"><div class="shell narrow"><a class="text-link" href="/admin">← Volver al panel</a><h1>Revisar y editar ficha</h1>
+    <section class="section"><div class="shell narrow"><a class="text-link" href="/admin<?= admin_context_query() !== '' ? '?' . h(admin_context_query()) : '' ?>">← Volver al panel</a><h1>Revisar y editar ficha</h1>
     <?php if ($dataset === 'submissions'): ?><div class="notice"><strong>Contacto privado:</strong> <?= h($record['submitter_name'] ?? '') ?> · <?= h($record['email'] ?? '') ?> · <?= h($record['whatsapp'] ?? '') ?><br>Relación: <?= h($record['relationship'] ?? '') ?> · Referencia: <?= h($record['reference'] ?? '') ?></div><?php endif; ?>
     <?php if ($dataset === 'submissions') admin_whatsapp_links($record); ?>
-    <form class="submission-form" method="post" action="/admin/edit" enctype="multipart/form-data">
-    <?= csrf_field() ?><input type="hidden" name="dataset" value="<?= h($dataset) ?>"><input type="hidden" name="id" value="<?= h($id) ?>"><input type="hidden" name="revision" value="<?= h(record_revision($revisionRecord)) ?>">
+    <form class="submission-form" data-admin-draft="<?= h(current_admin_account_id()) ?>" data-admin-saved="<?= !empty($GLOBALS['perro_flash']) && $GLOBALS['perro_flash']['type'] === 'success' && str_starts_with($GLOBALS['perro_flash']['message'], 'Ficha corregida.') ? '1' : '0' ?>" method="post" action="/admin/edit<?= admin_context_query() !== '' ? '?' . h(admin_context_query()) : '' ?>" enctype="multipart/form-data">
+    <?= csrf_field() ?><input type="hidden" name="dataset" value="<?= h($dataset) ?>"><input type="hidden" name="id" value="<?= h($id) ?>"><input type="hidden" name="revision" value="<?= h($revision) ?>">
+    <?php if ($dataset === 'submissions'): ?><label>Corregir WhatsApp privado<input type="tel" name="whatsapp" maxlength="40" value="<?= h(method_is_post() ? text('whatsapp', 40) : $record['whatsapp']) ?>"><span class="field-help">Confirmá la corrección con el responsable. Se conserva su elección de privacidad.</span></label><?php endif; ?>
     <fieldset><legend>Datos del aviso</legend><div class="field-grid">
     <?php $labels = ['listing_type'=>'Tipo de aviso', 'name'=>'Nombre del perro', 'department'=>'Departamento', 'city'=>'Ciudad', 'age_group'=>'Etapa', 'approximate_age'=>'Edad aproximada', 'sex'=>'Sexo', 'size'=>'Tamaño', 'breed_label'=>'Raza o apariencia', 'vaccination_status'=>'Vacunas', 'sterilization_status'=>'Esterilización', 'last_location'=>'Zona aproximada del aviso', 'incident_date'=>'Fecha de pérdida o hallazgo'];
     foreach ($labels as $key => $label): ?><label><?= h($label) ?><?php if (isset(listing_options()[$key])): ?><select name="<?= h($key) ?>"><?php select_options(listing_options()[$key], ($record[$key] ?? '') ?: (in_array($key, ['vaccination_status', 'sterilization_status'], true) ? 'No informado' : '')); ?></select><?php else: ?><input name="<?= h($key) ?>" type="<?= $key === 'incident_date' ? 'date' : 'text' ?>" maxlength="<?= listing_fields()[$key] ?>" value="<?= h($record[$key] ?? '') ?>"><?php endif; ?></label><?php endforeach; ?>
@@ -402,5 +417,9 @@ function admin_edit_routes(string $path): void
     <p><strong>Permisos actuales:</strong> nombre <?= ($record['public_name'] ?? false) === true ? h($record['public_display_name'] ?? $record['contact_name'] ?? '') : 'privado' ?> · <?= h(whatsapp_visibility_label(($record['public_whatsapp'] ?? false) === true || ($dataset === 'dogs' && !empty($record['contact_whatsapp'])))) ?>.</p>
     <label class="check"><input type="checkbox" name="hide_name" value="1"> Retirar el nombre público (revocar permiso)</label><label class="check"><input type="checkbox" name="hide_whatsapp" value="1"> Retirar el WhatsApp público (revocar permiso)</label><p>No se puede conceder un nuevo permiso en nombre del responsable. Necesita un nuevo envío con su autorización.</p></fieldset>
     <fieldset><legend>Revisión interna</legend><label>Nota privada<textarea name="internal_note" maxlength="1500"><?= h($record['internal_note'] ?? '') ?></textarea></label><label class="check"><input type="checkbox" name="review_confirm" value="1" required> Revisé los datos, las fotos y los permisos. Confirmé con el responsable cualquier cambio de situación; el aviso no ofrece venta, cría ni cobros por entrega.</label></fieldset><div class="editor-save-bar"><button class="button button-full" type="submit">Guardar correcciones</button><a class="text-link" href="/admin">Volver sin guardar</a></div></form></div></section>
-    <?php render_footer(); exit;
+    <?php if ($dataset === 'submissions'): ?><section class="section"><div class="shell narrow"><h2>Decisión de revisión</h2><?php render_submission_actions($record); ?></div></section><?php endif;
+    $published = $dataset === 'dogs' ? $record : (!empty($record['published_dog_id']) ? find_record('dogs', $record['published_dog_id']) : null);
+    if ($published) { echo '<div class="shell narrow"><h2>Estado del aviso</h2>'; render_admin_dog($published, 'publicadas'); echo '</div>'; }
+    ?><section class="section"><div class="shell narrow"><details><summary>Eliminar datos de este envío</summary><p>Verificá la identidad y la solicitud antes de borrar. Incluye sus avisos, contactos, notas, reportes y fotos. Los respaldos y copias externas necesitan revisión aparte.</p><form method="post" action="/admin/delete"><?= csrf_field() ?><input type="hidden" name="id" value="<?= h($id) ?>"><label class="check"><input type="checkbox" name="delete_confirm" value="1" required> Confirmo la supresión de estos datos.</label><button class="button button-danger" type="submit">Eliminar datos y fotos</button></form></details></div></section><?php
+    render_footer(); exit;
 }

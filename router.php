@@ -17,5 +17,4 @@ if ($blocked) {
 if (($path === '/favicon.svg' || str_starts_with($path, '/assets/')) && is_file($file)) {
     return false;
 }
-$_GET['path'] = trim($path, '/');
 require __DIR__ . '/index.php';

@@ -41,3 +41,10 @@ Follow REDEPLOY.md. Run syntax checks over all PHP files and node tools/privacy-
 ## Future donations
 
 Public anonymity must be the initial choice in any future support form. Recognition consent, amount-publication consent and newsletter consent are separate. A public name or business logo can appear only after authorized, verified funding; it can later be removed. Financial records may still identify a payer. Identify the recipient, purpose, tax/documentation treatment, management budget and cancellation/refund rules before collecting funds. Adoption approval/publication/access never depends on contributions. Advertisements must be accounted for according to their real commercial nature.
+
+
+## Versiones compatibles y revisión 2026-10-07
+
+PERRO_COMPATIBLE_TERMS y PERRO_COMPATIBLE_PRIVACY enumeran versiones previamente aceptadas compatibles. Una revisión editorial no invalida la cola pendiente. Un cambio material de finalidad, difusión de contactos, terceros, cobros o permisos requiere quitar las versiones incompatibles y obtener una nueva aceptación del responsable; nunca la concede un administrador por él. El formulario nuevo siempre registra la versión vigente. No agregues una versión desconocida solo para destrabar una aprobación.
+
+Esta revisión documenta contadores agregados de clics/resultados, sin identificadores de adoptantes, y conserva la versión 2026-10-05 como compatible. Las fotos usan caché privada con revalidación; la supresión verificada tiene herramienta administrativa que incluye contactos, notas, reportes, cachés y fotos. Revisá los respaldos por separado. El borrador del editor vive en la pestaña del administrador por hasta cuatro horas, excluye contraseñas y tokens CSRF, se limpia después de guardar/cerrar sesión y no conserva fotos nuevas.

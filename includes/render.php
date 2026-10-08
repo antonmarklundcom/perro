@@ -10,7 +10,7 @@ function asset_url(string $path): string
 
 function search_text(string $value): string
 {
-    return strtolower(strtr($value, ['Á'=>'a', 'É'=>'e', 'Í'=>'i', 'Ó'=>'o', 'Ú'=>'u', 'Ü'=>'u', 'Ñ'=>'n', 'á'=>'a', 'é'=>'e', 'í'=>'i', 'ó'=>'o', 'ú'=>'u', 'ü'=>'u', 'ñ'=>'n']));
+    return fold_accents($value);
 }
 
 function record_status_label(string $status): string
@@ -31,7 +31,10 @@ function page_meta(string $title, string $description, string $path = '', bool $
         'description' => $description,
         'canonical' => app_url($path),
         'robots' => $robots,
-        'image' => $image ?: app_url('assets/images/hero-perro.webp'),
+        'image' => $image ?: app_url('assets/images/default-preview.jpg'),
+        'image_width' => $image ? null : 1200,
+        'image_height' => $image ? null : 630,
+        'image_type' => $image ? null : 'image/jpeg',
     ];
 }
 
@@ -43,7 +46,7 @@ function project_whatsapp_message(): string
         $dog = public_dog_by_slug($matches[1]);
         if ($dog) {
             $type = listing_options()['listing_type'][$dog['listing_type'] ?? 'adoption'] ?? 'Aviso';
-            return 'Hola, vi la ficha de ' . $dog['name'] . ' (' . $type . ') en Perro.com.py y quisiera consultar o aportar información.';
+            return enquiry_message($dog);
         }
     }
 
@@ -76,6 +79,8 @@ function render_header(array $meta): void
 {
     global $config;
     $flash = take_flash();
+    $GLOBALS['perro_flash'] = $flash;
+    if (session_status() !== PHP_SESSION_ACTIVE && $meta['robots'] === 'index,follow') header('Cache-Control: public, max-age=60, must-revalidate');
     $whatsappUrl = project_whatsapp_url();
     $isAdminPage = request_path() === 'admin' || request_path() === 'activar-admin' || str_starts_with(request_path(), 'admin/');
     ?><!doctype html>
@@ -139,6 +144,7 @@ function render_header(array $meta): void
 function render_footer(): void
 {
     global $config;
+    if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
     $whatsappUrl = project_whatsapp_url();
     $isAdminPage = request_path() === 'admin' || request_path() === 'activar-admin' || str_starts_with(request_path(), 'admin/');
     ?>
@@ -153,6 +159,7 @@ function render_footer(): void
             <h2>Explorá</h2>
             <a href="/perros">Perros en adopción</a>
             <a href="/cachorros-en-adopcion">Cachorros en adopción</a>
+            <a href="/perros-perdidos-paraguay">Perdidos y encontrados</a>
             <a href="/dar-perro-en-adopcion">Dar un perro en adopción</a>
             <a href="/centros-de-adopcion">Centros y organizaciones</a>
         </div>
@@ -162,7 +169,7 @@ function render_footer(): void
             <a href="/seguridad">Adopción segura</a>
             <a href="/terminos">Términos</a>
             <a href="/privacidad">Privacidad</a>
-            <?php if ($whatsappUrl): ?><a href="<?= h($whatsappUrl) ?>" target="_blank" rel="noopener noreferrer">WhatsApp: +595 992 279 599</a><?php endif; ?>
+            <?php if ($whatsappUrl): ?><a href="<?= h($whatsappUrl) ?>" target="_blank" rel="noopener noreferrer">WhatsApp: +<?= h($config['contact_whatsapp']) ?></a><?php endif; ?>
             <a href="/admin">Administración</a>
         </div>
     </div>
@@ -172,7 +179,7 @@ function render_footer(): void
     </div>
 </footer>
 <?php if (!$isAdminPage && request_path() !== 'dar-perro-en-adopcion' && !str_starts_with(request_path(), 'perro/') && $whatsappUrl): ?>
-<a class="whatsapp-float" href="<?= h($whatsappUrl) ?>" target="_blank" rel="noopener noreferrer" aria-label="Escribinos por WhatsApp al +595 992 279 599">
+<a class="whatsapp-float" href="<?= h($whatsappUrl) ?>" target="_blank" rel="noopener noreferrer" aria-label="Escribinos por WhatsApp al +<?= h($config['contact_whatsapp']) ?>">
     <span class="whatsapp-float-icon" aria-hidden="true">WA</span>
     <strong>WhatsApp</strong>
 </a>
@@ -192,7 +199,9 @@ function render_error_page(string $title, string $message, int $status = 400): v
 
 function dog_card(array $dog): void
 {
-    $photo = $dog['photos'][0] ?? '';
+    static $renderedImages = 0;
+    $photo = listing_share_photo($dog) ? ($dog['photos'][0] ?? '') : '';
+    $first = $photo !== '' && $renderedImages++ === 0;
     $statusLabel = match ($dog['adoption_status'] ?? 'available') {
         'reserved' => 'Reservado',
         'adopted' => 'Adoptado',
@@ -201,16 +210,19 @@ function dog_card(array $dog): void
     };
     ?>
 <article class="dog-card">
-    <a class="dog-photo" href="/perro/<?= h($dog['slug']) ?>">
-        <?php if ($photo): ?><img src="/media/<?= h($dog['id']) ?>/<?= h($photo) ?>" alt="<?= h($dog['name']) ?>, perro publicado en <?= h($dog['city']) ?>" loading="lazy" width="800" height="600"><?php else: ?><span class="photo-placeholder">Sin foto disponible</span><?php endif; ?>
+    <a class="dog-card-link" href="/perro/<?= h($dog['slug']) ?>">
+    <div class="dog-photo">
+        <?php if ($photo): ?><img src="/media/<?= h($dog['id']) ?>/<?= h($photo) ?>?w=480" srcset="/media/<?= h($dog['id']) ?>/<?= h($photo) ?>?w=480 480w, /media/<?= h($dog['id']) ?>/<?= h($photo) ?>?w=960 960w" sizes="(max-width: 760px) 90vw, 30vw" alt="Foto de <?= h($dog['name']) ?>" <?= $first ? 'fetchpriority="high"' : 'loading="lazy"' ?> width="800" height="600"><?php else: ?><span class="photo-placeholder">Sin foto disponible</span><?php endif; ?>
         <span class="status-tag"><?= h($statusLabel) ?></span>
-    </a>
+    </div>
     <div class="dog-body">
-        <div class="dog-heading"><h2><a href="/perro/<?= h($dog['slug']) ?>"><?= h($dog['name']) ?></a></h2><span><?= h($dog['city']) ?></span></div>
+        <div class="dog-heading"><h2><?= h($dog['name']) ?></h2><span><?= h($dog['city']) ?></span></div>
         <p class="dog-meta"><?= h($dog['age_group']) ?> · <?= h($dog['sex']) ?> · <?= h($dog['size']) ?></p>
         <p><?= h($dog['breed_label'] ?: (!empty($dog['mixed_breed']) ? 'Mestizo o raza aproximada' : 'Raza no informada')) ?></p>
-        <a class="text-link" href="/perro/<?= h($dog['slug']) ?>">Conocé su historia <span aria-hidden="true">→</span></a>
+        <?php if ($dog['listing_type'] !== 'adoption'): ?><p><?= h(format_date($dog['incident_date'])) ?> · <?= h($dog['last_location']) ?></p><?php endif; ?>
+        <span class="text-link">Conocé su historia <span aria-hidden="true">→</span></span>
     </div>
+    </a>
 </article><?php
 }
 

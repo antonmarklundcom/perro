@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 function dataset_path(string $name): string
 {
-    $allowed = ['dogs', 'submissions', 'reports', 'moderation', 'settings', 'security'];
+    $allowed = ['dogs', 'submissions', 'reports', 'moderation', 'settings', 'security', 'archive', 'notifications'];
     if (!in_array($name, $allowed, true)) {
         throw new InvalidArgumentException('Dataset no permitido.');
     }
@@ -13,15 +13,63 @@ function dataset_path(string $name): string
 
 function read_dataset(string $name): array
 {
-    return with_data_lock(static function () use ($name): array {
+    dataset_path($name);
+    if (isset($GLOBALS['perro_datasets'][$name])) return $GLOBALS['perro_datasets'][$name];
+    return with_data_read_lock(static function () use ($name): array {
         $json = @file_get_contents(dataset_path($name));
         $decoded = $json === false ? null : json_decode($json, true);
         if (!is_array($decoded) || !array_is_list($decoded)
             || array_filter($decoded, static fn($record): bool => !is_array($record) || !is_string($record['id'] ?? null))) {
             throw new RuntimeException('No se puede leer el archivo de registros: ' . $name);
         }
-        return $decoded;
+        $GLOBALS['perro_dataset_reads'][$name] = ($GLOBALS['perro_dataset_reads'][$name] ?? 0) + 1;
+        return $GLOBALS['perro_datasets'][$name] = array_map(static fn(array $record): array => normalize_record($name, $record), $decoded);
     });
+}
+
+function normalize_record(string $dataset, array $record): array
+{
+    if (!in_array($dataset, ['dogs', 'submissions', 'reports'], true)) return $record;
+    unset($record['needs_repair']);
+    $defaults = array_fill_keys(['name', 'city', 'department', 'slug', 'description', 'approximate_age', 'age_group', 'sex', 'size', 'breed_label', 'compatibility', 'health_information', 'vaccination_status', 'sterilization_status', 'adoption_requirements', 'last_location', 'incident_date', 'submitter_name', 'email', 'whatsapp', 'reference', 'contact_name', 'contact_whatsapp', 'internal_note', 'contact', 'reason', 'dog_name', 'dog_id'], '');
+    foreach ($defaults as $key => $value) if (!is_string($record[$key] ?? null)) $record[$key] = $value;
+    $record['name'] = $record['name'] ?: 'Sin nombre';
+    $record['listing_type'] = in_array($record['listing_type'] ?? '', ['adoption', 'lost', 'found'], true) ? $record['listing_type'] : 'adoption';
+    $record['status'] = is_string($record['status'] ?? null) ? $record['status'] : ($dataset === 'reports' ? 'open' : 'pending');
+    $record['adoption_status'] = is_string($record['adoption_status'] ?? null) ? $record['adoption_status'] : 'available';
+    $record['photos'] = array_values(array_filter(is_array($record['photos'] ?? null) ? $record['photos'] : [], static fn($p): bool => is_string($p) && preg_match('/^[a-z0-9_-]+\.(?:jpe?g|png|webp)$/Di', $p) === 1));
+    foreach (['source_submission_id', 'published_dog_id'] as $key) if (isset($record[$key]) && !is_string($record[$key])) unset($record[$key]);
+    if (!is_array($record['consents'] ?? null)) $record['consents'] = [];
+    $requiredDates = match ($dataset) { 'dogs'=>['created_at', 'published_at', 'updated_at', 'last_confirmed_at', 'expires_at'], 'submissions'=>['created_at', 'updated_at'], default=>['created_at'] };
+    foreach (['created_at', 'published_at', 'updated_at', 'last_confirmed_at', 'expires_at'] as $key) {
+        if (!is_string($record[$key] ?? null) || strtotime($record[$key]) === false) {
+            if (in_array($key, $requiredDates, true)) $record['needs_repair'] = true;
+            $record[$key] = date(DATE_ATOM, 0);
+        }
+    }
+    // Invalid contacts never become public links; private originals remain available for correction.
+    $record['contact_whatsapp'] = valid_whatsapp($record['contact_whatsapp']);
+    return $record;
+}
+
+function clear_dataset_cache(): void
+{
+    $GLOBALS['perro_datasets'] = $GLOBALS['perro_indexes'] = $GLOBALS['perro_public'] = [];
+    unset($GLOBALS['perro_report_counts'], $GLOBALS['perro_hint_index']);
+}
+
+function with_data_read_lock(callable $operation): mixed
+{
+    if (($GLOBALS['perro_lock_depth'] ?? 0) > 0) return $operation();
+    $handle = @fopen(PERRO_DATA . '/application.lock', 'c+');
+    if (!$handle || !flock($handle, LOCK_SH)) throw new RuntimeException('No se pudo leer el almacenamiento.');
+    try {
+        if (is_file(PERRO_DATA . '/transaction.json')) {
+            flock($handle, LOCK_UN); fclose($handle); $handle = null;
+            return with_data_lock($operation);
+        }
+        return $operation();
+    } finally { if (is_resource($handle)) { flock($handle, LOCK_UN); fclose($handle); } }
 }
 
 // Serialize reads and mutations, including multi-file commits. A durable journal
@@ -38,6 +86,8 @@ function with_data_lock(callable $operation): mixed
         throw new RuntimeException('No se pudo bloquear el almacenamiento.');
     }
     $depth++;
+    $GLOBALS['perro_lock_depth'] = $depth;
+    clear_dataset_cache();
     try {
         $journal = PERRO_DATA . '/transaction.json';
         if (is_file($journal)) {
@@ -53,6 +103,7 @@ function with_data_lock(callable $operation): mixed
         return $operation();
     } finally {
         $depth--;
+        $GLOBALS['perro_lock_depth'] = $depth;
         flock($handle, LOCK_UN);
         fclose($handle);
     }
@@ -91,17 +142,19 @@ function write_dataset(string $name, array $records): bool
     }
     $saved = @rename($temp, $file);
     if (!$saved) @unlink($temp);
+    if ($saved) {
+        $GLOBALS['perro_datasets'][$name] = array_map(static fn(array $r): array => normalize_record($name, $r), array_values($records));
+        unset($GLOBALS['perro_indexes'][$name]);
+        $GLOBALS['perro_public'] = [];
+        unset($GLOBALS['perro_report_counts'], $GLOBALS['perro_hint_index']);
+    }
     return $saved;
 }
 
 function find_record(string $dataset, string $id): ?array
 {
-    foreach (read_dataset($dataset) as $record) {
-        if (($record['id'] ?? '') === $id) {
-            return $record;
-        }
-    }
-    return null;
+    if (!isset($GLOBALS['perro_indexes'][$dataset])) $GLOBALS['perro_indexes'][$dataset] = array_column(read_dataset($dataset), null, 'id');
+    return $GLOBALS['perro_indexes'][$dataset][$id] ?? null;
 }
 
 function save_record(string $dataset, array $record): bool
@@ -123,28 +176,37 @@ function save_record(string $dataset, array $record): bool
 
 function public_dogs(?string $listingType = null): array
 {
+    $key = $listingType ?? 'all';
+    if (isset($GLOBALS['perro_public'][$key])) return $GLOBALS['perro_public'][$key];
     $dogs = array_filter(read_dataset('dogs'), static function (array $dog) use ($listingType): bool {
         if (($dog['status'] ?? '') !== 'published') {
             return false;
         }
         if (in_array($dog['adoption_status'] ?? '', ['adopted', 'reunited'], true)) return false;
-        if (!empty($dog['expires_at']) && strtotime((string) $dog['expires_at']) < time()) {
+        if (empty($dog['expires_at']) || strtotime((string) $dog['expires_at']) <= time()) {
             return false;
         }
         return $listingType === null || ($dog['listing_type'] ?? 'adoption') === $listingType;
     });
-    usort($dogs, static fn(array $a, array $b): int => strtotime((string) ($b['published_at'] ?? '')) <=> strtotime((string) ($a['published_at'] ?? '')));
-    return array_values($dogs);
+    usort($dogs, static function (array $a, array $b) use ($listingType): int {
+        if ($listingType === 'adoption' && ($a['adoption_status'] === 'reserved') !== ($b['adoption_status'] === 'reserved')) return $a['adoption_status'] === 'reserved' ? 1 : -1;
+        return strtotime($b['published_at']) <=> strtotime($a['published_at']);
+    });
+    return $GLOBALS['perro_public'][$key] = array_values($dogs);
 }
 
 function public_dog_by_slug(string $slug): ?array
 {
-    foreach (public_dogs() as $dog) {
-        if (($dog['slug'] ?? '') === $slug) {
-            return $dog;
-        }
-    }
-    return null;
+    if (!isset($GLOBALS['perro_public']['slugs'])) $GLOBALS['perro_public']['slugs'] = array_column(public_dogs(), null, 'slug');
+    return $GLOBALS['perro_public']['slugs'][$slug] ?? null;
+}
+
+function rate_address(): string
+{
+    $address = (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+    $packed = @inet_pton($address);
+    if ($packed !== false && strlen($packed) === 16 && substr($packed, 0, 12) === str_repeat("\0", 10) . "\xff\xff") return inet_ntop(substr($packed, 12));
+    return $packed !== false && strlen($packed) === 16 ? bin2hex(substr($packed, 0, 8)) . '/64' : $address;
 }
 
 function record_moderation(string $action, string $recordId, string $note = ''): void
@@ -153,7 +215,8 @@ function record_moderation(string $action, string $recordId, string $note = ''):
         'id' => random_id('mod-'),
         'action' => $action,
         'record_id' => $recordId,
-        'note' => $note,
+        // Free-text notes belong to the deletable record, never the permanent activity log.
+        'note' => '',
         'admin' => ($_SESSION['perro_admin'] ?? false) === true ? current_admin_account_id() : 'system',
         'created_at' => now_iso(),
     ]);
@@ -258,6 +321,7 @@ function save_submission_images(string $submissionId, ?array &$errors = null): a
             $written = $oriented && write_clean_photo($source, $partial) && @rename($partial, $destination);
         } finally { imagedestroy($source); @unlink($partial); }
         if ($written) {
+            prepare_photo_variants($destination);
             $saved[] = $filename;
         } else {
             $errors[] = 'No pudimos guardar una foto. Intentá nuevamente.';
@@ -265,39 +329,67 @@ function save_submission_images(string $submissionId, ?array &$errors = null): a
         }
     }
     if ($errors) {
-        foreach ($saved as $filename) @unlink($target . '/' . $filename);
+        foreach ($saved as $filename) delete_photo_files($target . '/' . $filename);
         return [];
     }
     return $saved;
 }
 
+function public_request_control(string $namespace, int $limit): ?array
+{
+        $control = find_record('security', 'public-rate') ?? ['id' => 'public-rate', 'secret' => bin2hex(random_bytes(32)), 'buckets' => []];
+        $buckets = array_filter($control['buckets'], static fn(array $bucket): bool => ($bucket['started'] ?? 0) > time() - 3600);
+        $key = $namespace . ':' . hash_hmac('sha256', rate_address(), $control['secret']);
+        $globalKey = $namespace . ':global';
+        $globalBucket = $buckets[$globalKey] ?? ['started' => time(), 'count' => 0];
+        if ($globalBucket['count'] >= 1000) return null;
+        $bucket = $buckets[$key] ?? ['started' => time(), 'count' => 0];
+        if ($bucket['count'] >= $limit) return null;
+        $bucket['count']++;
+        $buckets[$key] = $bucket;
+        $globalBucket['count']++;
+        $buckets[$globalKey] = $globalBucket;
+        if (count($buckets) > 5000) $buckets = array_slice($buckets, -5000, null, true);
+        $control['buckets'] = $buckets;
+        return $control;
+}
+
 function allow_public_request(string $namespace, int $limit): bool
 {
     return with_data_lock(static function () use ($namespace, $limit): bool {
-        $control = find_record('security', 'public-rate') ?? ['id' => 'public-rate', 'secret' => bin2hex(random_bytes(32)), 'buckets' => []];
-        $buckets = array_filter($control['buckets'], static fn(array $bucket): bool => ($bucket['started'] ?? 0) > time() - 3600);
-        $key = $namespace . ':' . hash_hmac('sha256', (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'), $control['secret']);
-        $bucket = $buckets[$key] ?? ['started' => time(), 'count' => 0];
-        if ($bucket['count'] >= $limit) return false;
-        $bucket['count']++;
-        $buckets[$key] = $bucket;
-        if (count($buckets) > 5000) $buckets = array_slice($buckets, -5000, null, true);
-        $control['buckets'] = $buckets;
+        $control = public_request_control($namespace, $limit);
+        if ($control === null) return false;
         if (!save_record('security', $control)) throw new RuntimeException('No se pudo guardar el control de solicitudes.');
         return true;
     });
 }
 
+function save_public_record(string $dataset, array $record, string $namespace, int $limit): string
+{
+    return with_data_lock(static function () use ($dataset, $record, $namespace, $limit): string {
+        $control = public_request_control($namespace, $limit);
+        if ($control === null) return 'limited';
+        $security = read_dataset('security');
+        $security = array_values(array_filter($security, static fn(array $r): bool => $r['id'] !== 'public-rate'));
+        $security[] = $control;
+        $records = read_dataset($dataset); $records[] = $record;
+        return commit_datasets(['security'=>$security, $dataset=>$records]) ? 'saved' : 'failed';
+    });
+}
+
 function remove_upload_folder(string $id): void
 {
-    $directory = PERRO_UPLOADS . '/' . basename($id);
+    if (!preg_match('/^[a-z0-9_-]+$/Di', $id)) throw new InvalidArgumentException('Carpeta de fotos inválida.');
+    $directory = PERRO_UPLOADS . '/' . $id;
     if (!is_dir($directory)) {
         return;
     }
+    $resolved = realpath($directory); $root = realpath(PERRO_UPLOADS);
+    if (!$resolved || !$root || dirname($resolved) !== $root || is_link($directory)) throw new RuntimeException('Carpeta de fotos fuera del almacenamiento.');
     foreach (glob($directory . '/*') ?: [] as $file) {
         if (is_file($file)) {
-            @unlink($file);
+            if (!@unlink($file)) throw new RuntimeException('No se pudo eliminar una foto.');
         }
     }
-    @rmdir($directory);
+    if (!@rmdir($directory)) throw new RuntimeException('No se pudo eliminar la carpeta de fotos.');
 }

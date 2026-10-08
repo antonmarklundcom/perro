@@ -32,7 +32,7 @@ La búsqueda incluye ciudad, departamento, edad, tamaño, sexo, disponibilidad y
 3. La administración ingresa en `/admin`.
 4. Al aprobar, se crea la ficha pública y se fija un vencimiento a 60 días.
 5. La administración puede revisar fotos privadas, editar datos y fotos, retirar permisos de contacto y gestionar estados según el tipo de aviso. Adoptados y reencontrados dejan de aparecer públicamente. Para renovar o reabrir un aviso, debe confirmar su vigencia con el responsable.
-6. Repetir una aprobación no duplica ni reabre una ficha. Las solicitudes antiguas sin aceptación de las reglas actuales necesitan un nuevo envío del responsable.
+6. Repetir una aprobación no duplica ni reabre una ficha. Las solicitudes con versiones expresamente compatibles conservan su aceptación; los cambios materiales requieren una nueva aceptación del responsable.
 
 ## Compartir y mantener avisos
 
@@ -40,7 +40,7 @@ La página /como-funciona explica el envío sin cuenta, los datos privados, la r
 
 Cada ficha aprobada y vigente tiene una sección /perro/{slug}#compartir con Facebook, WhatsApp, texto y enlace para copiar. Con una foto válida y GD/FreeType, ofrece JPEG de publicación (1080×1080) e historia (1080×1920); la vista previa de Facebook usa 1200×630. Se usa la primera foto real de la ficha y solo nombre, ciudad, tipo, estado e identificador público. El código público de ficha impreso en la imagen también se puede buscar en el catálogo correspondiente; es distinto de la referencia privada del envío. No se copian nombres/contactos del responsable, notas, referencias privadas ni la descripción a los materiales. Las fuentes Atkinson Hyperlegible se distribuyen con su licencia OFL.
 
-Las rutas /compartir/{slug}/{facebook|post|story}.jpg comprueban en cada solicitud que el aviso siga activo. No sirven imágenes pendientes, vencidas, retiradas, adoptadas o reencontradas. Las descargas se generan sin caché ni servicios externos y no añaden datos de almacenamiento. El panel de avisos ofrece un acceso directo al material y el borrador de publicación señala dónde encontrarlo.
+Las rutas /compartir/{slug}/{facebook|post|story}.jpg comprueban en cada solicitud que el aviso siga activo. No sirven imágenes pendientes, vencidas, retiradas, adoptadas o reencontradas. Las imágenes se generan con caché local privada del servidor, sin servicios externos; cada solicitud comprueba de nuevo la vigencia de la ficha. El panel de avisos ofrece un acceso directo al material y el borrador de publicación señala dónde encontrarlo.
 
 Instagram requiere subir el archivo manualmente y agregar el enlace de la ficha al sticker de una historia. Sin GD/FreeType o sin foto, siguen disponibles el texto y el enlace; una ficha sin foto no usa la imagen ilustrativa del sitio como si fuera su perro. Las copias descargadas y las vistas previas que guarda una red social no se actualizan ni se pueden retirar desde Perro. Revisá la ficha antes de volver a difundirla.
 
@@ -58,7 +58,7 @@ El panel móvil abre en **Pendientes** y separa revisión, avisos, reportes y co
 
 - El número general configurado es `+595 992 279 599`.
 - La cabecera, el pie y el botón flotante usan mensajes según la página visitada. El hero permite adoptar o publicar; el botón flotante se oculta en los formularios y las fichas para no tapar campos.
-- En una ficha individual, el mensaje incluye el nombre del perro.
+- En una ficha individual, el mensaje incluye nombre, código público, ciudad y URL.
 - Dentro de `/admin`, cada solicitud tiene un botón para escribir al remitente con el nombre del perro y la referencia ya incluidos.
 - WhatsApp no aprueba ni publica nada automáticamente: las decisiones siguen ocurriendo dentro de `/admin`.
 
@@ -80,6 +80,10 @@ El recorte es definitivo. Al guardar, se crea un nuevo JPEG sin metadatos de has
 - Los registros JSON se actualizan bajo un bloqueo global y un diario de recuperación para cambios en varios archivos. Un archivo dañado produce un error y no se reemplaza silenciosamente por datos vacíos.
 - El almacenamiento JSON con bloqueo de archivos es suficiente para un proyecto pequeño. Si crece a cientos de envíos concurrentes, migrá a MySQL.
 - No borres ni reemplaces el contenido de `storage/data` durante una actualización sin hacer una copia.
+
+## Operación después de la auditoría
+
+Consultá **OPERATIONS.md** para alertas opcionales, /health, respaldo diario, restauración, archivo mensual, variantes de fotos y supresión verificada. El panel pagina 25 registros por pestaña, busca referencias/códigos/teléfonos/correos, permite reabrir rechazos y muestra Por confirmar. Las fichas adoptadas o reencontradas responden 410 con otros avisos cercanos. El enlace /contactar cuenta clics agregados, sin identificar visitantes; los resultados de adopción se registran por confirmación y se exportan en CSV. Los slugs existentes se conservan al cambiar el nombre.
 
 ## Copias de seguridad
 

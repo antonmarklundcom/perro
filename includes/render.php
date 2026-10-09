@@ -78,6 +78,11 @@ function project_whatsapp_url(?string $message = null): string
 function render_header(array $meta): void
 {
     global $config;
+    if (empty($config['indexing_enabled'])) $meta['robots'] = 'noindex,nofollow';
+    elseif ($meta['robots'] === 'index,follow' && $_GET) {
+        $discovery = in_array(request_path(), ['perros', 'cachorros-en-adopcion', 'perros-de-raza-en-adopcion', 'perros-perdidos-paraguay'], true);
+        if (!$discovery || array_diff(array_keys($_GET), ['page'])) $meta['robots'] = 'noindex,follow';
+    }
     $flash = take_flash();
     $GLOBALS['perro_flash'] = $flash;
     if (session_status() !== PHP_SESSION_ACTIVE && $meta['robots'] === 'index,follow') header('Cache-Control: public, max-age=60, must-revalidate');
@@ -167,6 +172,8 @@ function render_footer(): void
             <h2>Información</h2>
             <a href="/como-funciona">Cómo publicar y actualizar un aviso</a>
             <a href="/seguridad">Adopción segura</a>
+            <a href="/guias-adopcion">Guías para adoptar y ayudar</a>
+            <a href="/apoyar">Cómo apoyar Perro</a>
             <a href="/terminos">Términos</a>
             <a href="/privacidad">Privacidad</a>
             <?php if ($whatsappUrl): ?><a href="<?= h($whatsappUrl) ?>" target="_blank" rel="noopener noreferrer">WhatsApp: +<?= h($config['contact_whatsapp']) ?></a><?php endif; ?>

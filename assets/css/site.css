@@ -424,3 +424,20 @@ details[open] > summary { margin-bottom: 12px; }
   body:has(.inline-report :focus) .mobile-contact { display: none; }
   .inline-report input, .inline-report textarea { scroll-margin-bottom: 110px; }
 }
+
+/* Adoption guides: readable article navigation and keyboard-accessible FAQs. */
+.editorial-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1.5rem; margin:1.5rem 0; }
+.editorial-grid article { background:var(--paper,#fff); padding:1.4rem; border:1px solid #dce6df; border-radius:16px; }
+.editorial-grid h3 { margin:0 0 .6rem; font-size:1.15rem; }
+.editorial-grid p { margin:0; }
+.breadcrumbs { margin-bottom:1rem; font-size:.9rem; }
+.editorial-date { font-size:.9rem; color:#4c6057; }
+.guide-toc { border:1px solid #dce6df; border-radius:12px; padding:1.2rem; background:#f5f8f5; }
+.guide-toc ul { margin-bottom:0; }
+.guide-faq { margin:.8rem 0; border:1px solid #dce6df; border-radius:10px; padding:1rem; }
+.guide-faq summary { cursor:pointer; font-weight:700; }
+.guide-faq p { margin-bottom:0; }
+.editorial-sources { margin-top:2rem; padding-top:1rem; border-top:1px solid #dce6df; }
+.prose section[id], .prose h2[id] { scroll-margin-top:7rem; }
+@media(max-width:900px) { .editorial-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:600px) { .editorial-grid { grid-template-columns:1fr; } }

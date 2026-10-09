@@ -92,3 +92,14 @@ Descargá periódicamente la carpeta `storage`. El panel permite exportar las fi
 ## Prueba de desarrollo
 
 `node tools/privacy-smoke.cjs` verifica rutas y flujos con datos sintéticos en una copia temporal. Configurá `PERRO_PHP_BIN` si PHP no está en PATH. Para habilitar GD localmente en la prueba, podés configurar `PERRO_PHP_GD_DIR`; agregá `PERRO_PHP_EXIF=1` para habilitar la extensión EXIF instalada. La prueba comprueba etiquetas, CSV privado, orientación, giro, recorte y errores de guardado cuando GD está disponible, y la conservación de fotos sin GD. No hace falta Node en Hostinger.
+
+
+## SEO, guías y coordinación con Mascota — 9 octubre 2026
+
+Consultá [el informe y mapa de páginas](docs/seo/2026-10-09/README.md), [el modelo de ingresos](docs/business/2026-10-09/REVENUE-PLAN.md) y [el release con pruebas/subida/rollback](docs/verification/2026-10-09/SEO-RELEASE.md).
+
+Siete páginas nuevas orientan requisitos, elección, hogar temporal, reubicación, llegada y apoyo; seguridad y los catálogos existentes se amplían sin cambiar los avisos ni su moderación. `/docs` contiene documentación privada al público bajo Apache/router y se excluye del ZIP; no guardes secretos allí ni asumas que la denegación sustituye protección del servidor.
+
+Para staging configurá `PERRO_NOINDEX=1` en el proceso PHP: robots, meta y cabecera bloquean indexación. Confirmá que esté desactivado en producción. `PERRO_MASCOTA_GUIDES_ENABLED=1` activa enlaces contextuales solo después de publicar/verificar las cinco guías de Mascota; por defecto están deshabilitados porque el dominio mostró una página de hosting por defecto.
+
+`node tools/seo-smoke.cjs` agrega pruebas aisladas de SEO y estados. `python tools/build-release.py DESTINO.zip` prepara desde una revisión limpia y comprometida solo archivos de aplicación para Hostinger, sin storage privado, investigación o configuración secreta. La adopción sigue gratuita y la página `/apoyar` no habilita cobros.

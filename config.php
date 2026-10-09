@@ -8,6 +8,10 @@ return [
     'locale' => 'es-PY',
     'timezone' => 'America/Asuncion',
     'demo_mode' => false,
+    // Set PERRO_NOINDEX=1 in every staging/preview PHP process.
+    'indexing_enabled' => getenv('PERRO_NOINDEX') !== '1',
+    // Enable contextual links only after the Mascota guides are live and checked.
+    'mascota_guides_enabled' => getenv('PERRO_MASCOTA_GUIDES_ENABLED') === '1',
     'contact_whatsapp' => '595992279599',
     // Datos públicos del responsable. Completalos antes de publicar esta versión.
     'operator_name' => (getenv('PERRO_OPERATOR_NAME') ?: ''),

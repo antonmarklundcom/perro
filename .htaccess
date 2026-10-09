@@ -5,7 +5,7 @@ DirectoryIndex index.php
 RewriteEngine On
 
 RewriteRule (^|/)\. - [F,L]
-RewriteRule ^(?:storage|includes|tools)(?:/|$) - [F,L,NC]
+RewriteRule ^(?:storage|includes|tools|docs)(?:/|$) - [F,L,NC]
 
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d

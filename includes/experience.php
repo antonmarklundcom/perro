@@ -12,6 +12,7 @@ function render_public_schema(array $meta): void
 {
     $path = request_path();
     if ($path === 'admin' || $path === 'activar-admin' || str_starts_with($path, 'admin/') || $meta['robots'] !== 'index,follow') return;
+    if (function_exists('render_editorial_schema') && render_editorial_schema($meta)) return;
     $schema = ['@context'=>'https://schema.org', '@type'=>'WebSite', 'name'=>'Perro', 'url'=>app_url(), 'inLanguage'=>'es-PY'];
     if (preg_match('#^perro/([a-z0-9-]+)$#', $path, $matches) && ($dog = public_dog_by_slug($matches[1]))) {
         $adoption = ($dog['listing_type'] ?? 'adoption') === 'adoption';
@@ -38,7 +39,10 @@ function location_suggestions(): void
 
 function discovery_url(string $path, array $filters, array $changes = []): string
 {
-    $values = array_filter(array_replace($filters, $changes), static fn($v): bool => $v !== '' && $v !== null);
+    $values = array_replace($filters, $changes);
+    if (($values['sort'] ?? '') === 'newest') unset($values['sort']);
+    if ($path === 'cachorros-en-adopcion') unset($values['age']);
+    $values = array_filter($values, static fn($v): bool => $v !== '' && $v !== null);
     return '/' . $path . ($values ? '?' . http_build_query($values) : '');
 }
 
@@ -75,14 +79,19 @@ function render_discovery(string $path): void
         return ($filters['sort'] === 'newest' ? -$order : $order) ?: strcmp($a['id'], $b['id']);
     });
     $count = count($dogs); $pages = max(1, (int) ceil($count / 12));
-    $page = min($pages, max(1, (int) query_value('page', 8)));
+    $rawPage = $_GET['page'] ?? '1';
+    if (!is_string($rawPage) || !preg_match('/^[1-9][0-9]{0,7}$/D', $rawPage) || (int) $rawPage > $pages) {
+        render_error_page('Página de resultados no disponible', 'Volvé al catálogo para ver los avisos vigentes.', 404); return;
+    }
+    $page = (int) $rawPage;
     $visible = array_slice($dogs, ($page - 1) * 12, 12);
     $active = array_filter($filters, static fn($v, $k): bool => $v !== '' && !($k === 'sort' && $v === 'newest') && !($k === 'age' && $path === 'cachorros-en-adopcion'), ARRAY_FILTER_USE_BOTH);
     $heading = match ($path) { 'perros-perdidos-paraguay'=>'Perros perdidos y encontrados', 'cachorros-en-adopcion'=>'Cachorros en adopción', 'perros-de-raza-en-adopcion'=>'Perros de raza en adopción', default=>'Perros para adoptar' };
     $meta = page_meta(($heading . ' en Paraguay' . ($page > 1 ? ' · Página ' . $page : '') . ' | Perro'), $lost ? 'Buscá avisos de perros perdidos y encontrados por ciudad y departamento en Paraguay.' : match ($path) { 'cachorros-en-adopcion'=>'Buscá cachorros en adopción gratuita y conocé los cuidados que necesitan en Paraguay.', 'perros-de-raza-en-adopcion'=>'Buscá perros con raza declarada en adopción gratuita. La raza puede ser aproximada.', default=>'Encontrá perros en adopción gratuita en Paraguay por ciudad, edad, sexo y tamaño.' }, $path . ($page > 1 ? '?page=' . $page : ''));
     if ($active) $meta['robots'] = 'noindex,follow';
+    if ($active && !$count) http_response_code(404);
     render_header($meta);
-    ?><section class="page-hero compact"><div class="shell"><span class="eyebrow"><?= $lost ? 'Ayudemos a que vuelvan' : 'Adopción responsable' ?></span><h1><?= h($heading) ?></h1><p><?= $lost ? 'Buscá por zona o tipo de aviso. Un perro encontrado no se ofrece en adopción hasta aclarar su situación.' : 'Encontrá un perro compatible con tu hogar. Todos los avisos pasan por revisión; no se permiten ventas.' ?></p><?php if ($lost): ?><div class="button-row"><a class="button" href="/dar-perro-en-adopcion?type=lost">Perdí un perro</a><a class="button button-secondary" href="/dar-perro-en-adopcion?type=found">Encontré un perro</a></div><?php endif; ?></div></section>
+    ?><section class="page-hero compact"><div class="shell"><nav class="breadcrumbs" aria-label="Ruta de navegación"><a href="/">Inicio</a> / <?= h($heading) ?></nav><span class="eyebrow"><?= $lost ? 'Ayudemos a que vuelvan' : 'Adopción responsable' ?></span><h1><?= h($heading) ?></h1><p><?= $lost ? 'Buscá por zona o tipo de aviso. Un perro encontrado no se ofrece en adopción hasta aclarar su situación.' : 'Encontrá un perro compatible con tu hogar. Todos los avisos pasan por revisión; no se permiten ventas.' ?></p><?php if ($lost): ?><div class="button-row"><a class="button" href="/dar-perro-en-adopcion?type=lost">Perdí un perro</a><a class="button button-secondary" href="/dar-perro-en-adopcion?type=found">Encontré un perro</a></div><?php endif; ?></div></section>
     <section class="section listings-layout"><div class="shell">
     <details class="filter-disclosure" open><summary>Buscar y filtrar<?= $active ? ' · ' . count($active) . ' activo(s)' : '' ?></summary>
     <form class="filters discovery-filters" method="get" action="/<?= h($path) ?>">
@@ -99,7 +108,9 @@ function render_discovery(string $path): void
     <?php if ($visible): ?><div class="dog-grid"><?php foreach ($visible as $dog) dog_card($dog); ?></div><?php else: ?><div class="empty-state"><h2><?= $active ? 'No encontramos fichas con esos filtros' : 'Todavía no hay avisos activos' ?></h2><p><?= $active ? 'Probá otra zona o quitá algún filtro. Los avisos que terminaron o vencieron dejan de aparecer.' : '¿Conocés un perro que necesita ayuda? Enviá un aviso real para que el equipo lo revise.' ?></p><div class="button-row"><a class="button" href="/<?= h($path) ?>">Ver todos</a><a class="button button-secondary" href="/dar-perro-en-adopcion">Publicar un aviso</a></div></div><?php endif; ?>
     <?php if ($pages > 1): ?><nav class="pagination" aria-label="Páginas de resultados"><?php if ($page > 1): ?><a class="button button-secondary" href="<?= h(discovery_url($path, $filters, ['page'=>$page - 1])) ?>">← Anterior</a><?php endif; ?><span>Página <?= $page ?> de <?= $pages ?></span><?php if ($page < $pages): ?><a class="button button-secondary" href="<?= h(discovery_url($path, $filters, ['page'=>$page + 1])) ?>">Siguiente →</a><?php endif; ?></nav><?php endif; ?>
     </div></section><?php if ($path === 'perros-de-raza-en-adopcion'): ?><section class="section section-note"><div class="shell narrow"><h2>La raza puede ser aproximada</h2><p>Perro no certifica pedigrí ni pureza de raza. Priorizá el carácter, los cuidados y la compatibilidad real. La adopción es gratuita; los cuidados diarios y veterinarios tienen costos.</p></div></section><?php endif; ?>
-    <?php if (!$visible) render_nearby(['department'=>$filters['department']]); render_footer();
+    <?php if (!$visible) render_nearby(['department'=>$filters['department']]);
+    if ($page === 1 && !$active) render_discovery_guidance($path);
+    render_footer();
 }
 
 // Resolve private submission data only after the administrator has authenticated.

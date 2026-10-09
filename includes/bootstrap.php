@@ -29,6 +29,7 @@ header("Permissions-Policy: geolocation=(), microphone=(), camera=()");
 header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'; form-action 'self'; base-uri 'self'; frame-ancestors 'self'");
 header('Cache-Control: no-store');
 header_remove('X-Powered-By');
+if (!$config['indexing_enabled']) header('X-Robots-Tag: noindex, nofollow');
 if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') header('Strict-Transport-Security: max-age=31536000');
 // Keep partial rendering private until the response has completed successfully.
 if (PHP_SAPI !== 'cli') ob_start();
@@ -44,7 +45,7 @@ function perro_release_id(): string
     static $id;
     if ($id === null) {
         $hashes = [];
-        foreach (['index.php', 'router.php', 'includes/bootstrap.php', 'includes/data.php', 'includes/legal.php', 'includes/moderation.php', 'includes/accounts.php', 'includes/experience.php', 'includes/sharing.php', 'includes/guidance.php', 'includes/render.php', 'includes/workflows.php', 'includes/admin-panel.php', 'includes/operations.php', 'assets/css/site.css', 'assets/js/site.js'] as $file) {
+        foreach (['index.php', 'router.php', 'includes/bootstrap.php', 'includes/data.php', 'includes/legal.php', 'includes/moderation.php', 'includes/accounts.php', 'includes/experience.php', 'includes/sharing.php', 'includes/guidance.php', 'includes/editorial.php', 'includes/render.php', 'includes/workflows.php', 'includes/admin-panel.php', 'includes/operations.php', 'assets/css/site.css', 'assets/js/site.js'] as $file) {
             $hashes[] = hash('sha256', str_replace("\r\n", "\n", file_get_contents(PERRO_ROOT . '/' . $file)));
         }
         $hashes[] = hash('sha256', str_replace("\r\n", "\n", file_get_contents(PERRO_ROOT . '/.htaccess')));

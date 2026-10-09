@@ -12,7 +12,7 @@ if subprocess.check_output(["git", "status", "--porcelain"], cwd=root).strip():
     raise SystemExit("Commit reviewed changes before packaging; working tree must be clean.")
 revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
 tracked = subprocess.check_output(["git", "ls-files", "-z"], cwd=root).decode().split("\0")
-allowed = {"index.php", "config.php", "router.php", ".htaccess", "favicon.svg", "storage/.htaccess"}
+allowed = {"index.php", "config.php", "router.php", ".htaccess", "favicon.svg", "storage/.htaccess", "tools/maintenance.php"}
 files = [name for name in tracked if name in allowed or name.startswith(("includes/", "assets/"))]
 if not files or "includes/editorial.php" not in files:
     raise SystemExit("Incomplete release file list")

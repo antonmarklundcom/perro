@@ -41,3 +41,7 @@ Modelo recomendado: paquetes mensuales con trabajo entregable y reporte, no trá
 Search Console: propiedades de dominio separadas con DNS autorizado; exportar fecha, consulta, página, país y dispositivo. Construir vista combinada conservando dominio y filas originales. Las consultas anonimizadas/omitidas pueden impedir sumar el total completo. El KWP es prioridad investigativa, no un pronóstico de visitas.
 
 Eventos propuestos: Mascota `vet_contact_click` y `product_outbound_click`; Perro ya dispone de clics agregados de contacto y resultados confirmados por el equipo. Antes de agregar analítica nueva: definir base de privacidad, retención y exclusión de datos personales. No cambiar cuentas ni instalar trackers en esta tarea. No deduplicar personas por teléfono a partir de avisos privados.
+
+## Actualización de coordinación — 9 octubre 2026
+
+El [acuerdo común v1.0.0](../../portfolio/2026-10-09/MASCOTA-PERRO-AGREEMENT.md) y su mapa/modelo son la referencia de coordinación actual. PR9 está fusionado en `46b3297e8995b85e00d38f06272f6d96ed604a03`; GET público posterior confirmó seis destinos de Perro 200 y release `perro-e70f6ea29560`. Mascota continúa default hosting/guías 404; su incremento local prepara 64 rutas, herramientas y enlaces contextuales hacia Perro ya verificado. `/veterinarias/` sigue diferido, no una ruta existente. No runtime/deploy/pagos/contactos desde esta actualización; la documentación anterior conserva sus checks históricos.

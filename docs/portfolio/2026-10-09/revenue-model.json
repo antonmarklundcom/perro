@@ -1,0 +1,73 @@
+{
+  "strategyVersion": "1.0.0",
+  "date": "2026-10-09",
+  "currency": "PYG",
+  "status": "Unvalidated planning hypotheses; no customers or revenue verified",
+  "assumptions": {
+    "netSalary": 4000000,
+    "workerIPS": 0.09,
+    "employerIPS": 0.165,
+    "aguinaldoProvision": "gross / 12",
+    "fixedMonthly": 800000,
+    "variableProvision": 0.15,
+    "collectionTarget": 9000000,
+    "deliveryHours500kPackage": 2,
+    "threeMonthsReserve": 18861538
+  },
+  "grossMonthly": 4395604,
+  "modeledLaborMonthly": 5487179,
+  "scenarios": [
+    {
+      "clients": 20,
+      "monthlyPrice": 500000,
+      "collectionRate": 0.95,
+      "billed": 10000000,
+      "collected": 9500000,
+      "variableProvision": 1425000,
+      "fixed": 800000,
+      "modeledLaborCost": 5487179,
+      "balanceBeforeBusinessTaxesAndOmittedCosts": 1787821,
+      "deliveryHoursMonthly": 40
+    },
+    {
+      "clients": 20,
+      "monthlyPrice": 500000,
+      "collectionRate": 0.8,
+      "billed": 10000000,
+      "collected": 8000000,
+      "variableProvision": 1200000,
+      "fixed": 800000,
+      "modeledLaborCost": 5487179,
+      "balanceBeforeBusinessTaxesAndOmittedCosts": 512821,
+      "deliveryHoursMonthly": 40
+    },
+    {
+      "clients": 15,
+      "monthlyPrice": 500000,
+      "collectionRate": 0.95,
+      "billed": 7500000,
+      "collected": 7125000,
+      "variableProvision": 1068750,
+      "fixed": 800000,
+      "modeledLaborCost": 5487179,
+      "balanceBeforeBusinessTaxesAndOmittedCosts": -230929,
+      "deliveryHoursMonthly": 30
+    }
+  ],
+  "productHypothesis": {
+    "netContributionAfterAllOrderCosts": 40000,
+    "ordersToCoverModeledLaborAndFixed": 158,
+    "ordersIllustration": 100,
+    "qualifiedVisitsAtHypothetical2PercentConversion": 5000
+  },
+  "excludedCosts": [
+    "business taxes",
+    "vacation and applicable leave",
+    "termination obligations",
+    "any other actual employment/business costs"
+  ],
+  "sources": [
+    "https://portal.ips.gov.py/sistemas/ipsportal/contenido.php?c=69",
+    "https://calculadoras.mtess.gov.py/agui/production/formaguinaldo.php"
+  ]
+}

@@ -1,3 +1,5 @@
+[Acuerdo editorial/comercial compartido v1.0.0](docs/portfolio/2026-10-09/MASCOTA-PERRO-AGREEMENT.md) · [90 días y acciones del propietario](docs/portfolio/2026-10-09/90-DAY-PLAN.md).
+
 # Perro.com.py — paquete Hostinger PHP
 
 Sitio ligero para difusión y moderación de adopciones de perros en Paraguay. No usa Node.js, npm, Firebase ni servicios de IA.

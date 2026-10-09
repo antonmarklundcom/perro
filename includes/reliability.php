@@ -4,9 +4,9 @@ declare(strict_types=1);
 function run_cleanup_jobs(int $limit = 20): array
 {
     return with_data_lock(static function () use ($limit): array {
-        $jobs = read_dataset('cleanup'); $done = 0; $failed = 0;
-        foreach ($jobs as &$job) {
-            if (($job['status'] ?? '') !== 'pending' || $done + $failed >= $limit) continue;
+        $jobs = read_dataset('cleanup'); $done = 0; $failed = 0; $ordered = []; $retry = [];
+        foreach ($jobs as $job) {
+            if (($job['status'] ?? '') !== 'pending' || $done + $failed >= $limit) { $ordered[] = $job; continue; }
             $job['attempts'] = (int) ($job['attempts'] ?? 0) + 1;
             try {
                 if (!is_array($job['folders'] ?? null)) throw new RuntimeException('Trabajo de limpieza inválido.');
@@ -19,10 +19,11 @@ function run_cleanup_jobs(int $limit = 20): array
                 foreach (glob($cache . '/share-*.jpg') ?: [] as $file) {
                     if (!@unlink($file)) throw new RuntimeException('No se pudo limpiar una imagen compartida.');
                 }
-                $job['status'] = 'done'; $job['completed_at'] = now_iso(); unset($job['error'], $job['folders']); $done++;
-            } catch (Throwable $error) { $job['error'] = 'filesystem_cleanup_failed'; $failed++; }
+                $job['status'] = 'done'; $job['completed_at'] = now_iso(); unset($job['error'], $job['folders']); $done++; $ordered[] = $job;
+            } catch (Throwable $error) { $job['error'] = 'filesystem_cleanup_failed'; $failed++; $retry[] = $job; }
         }
-        unset($job);
+        // Failed attempts yield to unattempted jobs on the next bounded run.
+        $jobs = array_merge($ordered, $retry);
         if ($done + $failed && !commit_datasets(['cleanup'=>$jobs])) throw new RuntimeException('No se pudo registrar la limpieza.');
         return ['completed'=>$done, 'failed'=>$failed, 'pending'=>count(array_filter($jobs, static fn(array $j): bool => ($j['status'] ?? '') === 'pending'))];
     });

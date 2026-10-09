@@ -6,7 +6,7 @@ This branch implements the next ten-task portfolio backlog: Perro storage diagno
 
 Perro remains PHP with private JSON. The previous release already had locks, transactional replay, backup creation and corruption checks. Concrete remaining gaps were initialization of any missing dataset, non-durable file-cleanup retry and unclaimed notification work; this release fixes them. Run the [status-first Claude prompt](CLAUDE-STATUS-FIRST.txt) for an independent audit; do not repeat completed setup/migrations.
 
-`storage/data/storage-state.json` records schema version 2. Fresh empty installations initialize ten datasets. Complete unversioned/v1 installations validate existing eight datasets before adding only `owner_actions` and `cleanup`, then record the version. Existing bytes/settings remain intact. Marked installations with a missing required file or incompatible state fail 503. Partial installations need private investigation; no empty replacement or implicit reset. Journal replay validates all pending dataset payloads before replacing files. Synced temporary files and serialized replacement improve interruption recovery; no promise is made for every filesystem/power-loss failure.
+`storage/data/storage-state.json` records schema version 2. `storage/installation.json` is a separate private installation marker that survives loss of the data directory. Preserve both markers with all storage during recovery. Fresh empty installations record an initializing phase before creating ten datasets, then mark installed. Only an explicitly marked initialization containing known empty scaffolding can resume; uploaded files, nonempty records, journals and unknown paths require investigation. Complete unversioned/v1 installations validate existing eight datasets before adding only `owner_actions` and `cleanup`, then record the version. Existing bytes/settings remain intact. Marked installations with a missing required file or incompatible state fail 503. Partial installations need private investigation; no empty replacement or implicit reset. Journal replay validates all pending dataset payloads before replacing files. Synced temporary files and serialized replacement improve interruption recovery; no promise is made for every filesystem/power-loss failure.
 
 The diagnostic command bypasses bootstrap and does not create directories/locks/files, normalize data on disk or replay a journal. Exit 0 means no issues; exit 2 means inspect its codes. Private reports contain counts/record IDs, never contact values.
 
@@ -18,7 +18,7 @@ Run against a private isolated copy for initial audit. A pending transaction is 
 
 ## Cleanup and notifications
 
-Permanent deletion removes associated records, owner tokens and public access in one transaction and creates a private cleanup job. Failed filesystem work remains pending; the panel warns. Retry is safe and idempotent. Completed jobs discard folder identifiers. Public/private media authorization remains authoritative even while pixels await cleanup.
+Permanent deletion removes associated records, owner tokens and public access in one transaction and creates a private cleanup job. Failed filesystem work remains pending; the panel warns. Attempted failures move behind unattempted jobs, so a blocked batch cannot indefinitely starve later deletion jobs. Retry is safe and idempotent. Completed jobs discard folder identifiers. Public/private media authorization remains authoritative even while pixels await cleanup.
 
 ```sh
 php /REAL/PERRO/tools/maintenance.php --cleanup
@@ -28,14 +28,14 @@ Notifications use a stable claim, a five-minute lease, at most five attempts, an
 
 ## Verified private backups
 
-Storage backup now includes a manifest of hashes, byte sizes, counts, data version and release fingerprint; a checksum sidecar accompanies the ZIP. Rotation retains 14 completed archives. Settings/accounts, private uploads and ancillary security files remain private; code/config backups are still separate deployment requirements. The tool cannot identify every other domain's document root: the owner must choose genuinely private paths and off-site copies.
+Storage backup includes the external installation marker and a manifest of hashes, byte sizes, counts, data version and release fingerprint; a checksum sidecar accompanies the ZIP. Rotation retains 14 completed archives. Settings/accounts, private uploads and ancillary security files remain private; code/config backups are still separate deployment requirements. The tool cannot identify every other domain's document root: the owner must choose genuinely private paths and off-site copies.
 
 ```sh
 php /REAL/PERRO/tools/maintenance.php --backup-dir=/REAL/PRIVATE/perro-backups
 php /REAL/PERRO/tools/maintenance.php --verify-backup=/REAL/PRIVATE/perro-backups/EXACT.zip --restore-dir=/REAL/PRIVATE/EMPTY-DRILL
 ```
 
-The restore parent must already exist; the target must be empty and outside the source installation. Verification rejects traversal, links, duplicate entries, mismatched hashes/counts and invalid references. It extracts only private storage into the drill directory, never executes archived files or replaces source data. A successful drill does not authorize live restoration. Retain damaged/partial verification output privately for investigation; choose a new empty destination for reruns. Legacy ZIPs without the new manifest remain historical backups, but cannot use this new verification command.
+The restore parent must already exist; the target must be empty and outside the source installation. Verification rejects traversal, links, duplicate entries, mismatched hashes/counts and invalid references. It extracts only private storage into the drill directory, never executes archived files or replaces source data. After hashes and records verify, the drill creates the fixed data/uploads directories even when uploads were empty in the ZIP, then checks startup invariants without executing archived code. Valid older schema-2 manifest backups without the external marker remain compatible. A successful drill does not authorize live restoration. Retain damaged/partial verification output privately for investigation; choose a new empty destination for reruns. Legacy ZIPs without the new manifest remain historical backups, but cannot use this new verification command.
 
 ## Team roles and owner links
 

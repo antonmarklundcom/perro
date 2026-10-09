@@ -14,6 +14,7 @@ function create_storage_backup(string $directory): string
             if ($zip->open($backup, ZipArchive::CREATE | ZipArchive::EXCL) !== true) throw new RuntimeException('No se pudo abrir la copia.');
             $manifest = ['format'=>'perro-storage-backup-v1', 'schema_version'=>PERRO_STORAGE_SCHEMA, 'release'=>perro_release_id(), 'created_at'=>now_iso(), 'counts'=>[], 'files'=>[]];
             try {
+                storage_assert_installed(PERRO_ROOT);
                 foreach (storage_dataset_names() as $name) $manifest['counts'][$name] = count(read_dataset($name));
                 $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(PERRO_STORAGE, FilesystemIterator::SKIP_DOTS));
                 foreach ($iterator as $file) {
@@ -99,6 +100,12 @@ function verify_storage_backup(string $archive, string $destination, string $sou
             $counts[$name] = count($rows);
             if (($manifest['counts'][$name] ?? null) !== $counts[$name]) throw new RuntimeException('No coincide el conteo respaldado.');
         }
+        // ZIPs omit empty directories. Recreate only the two fixed runtime
+        // directories after every archived file and dataset has been verified.
+        foreach (['storage/data', 'storage/uploads'] as $directory) {
+            if (!is_dir($destination . '/' . $directory) && !mkdir($destination . '/' . $directory, 0700, true)) throw new RuntimeException('No se pudo preparar una carpeta del respaldo.');
+        }
+        storage_assert_installed($destination, false);
         $doctor = storage_doctor($destination);
         $issues = array_values(array_filter($doctor['issues'], static fn(array $i): bool => $i['code'] !== 'missing_lock'));
         return ['ok'=>!$issues, 'mode'=>'isolated-restore-verification', 'schema_version'=>$manifest['schema_version'], 'release'=>$manifest['release'] ?? null, 'files'=>count($manifest['files']), 'counts'=>$counts, 'issues'=>$issues, 'archive_sha256'=>hash_file('sha256', $archive)];

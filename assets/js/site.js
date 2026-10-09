@@ -4,14 +4,14 @@
   const panel = document.querySelector('[data-saved-dogs]');
   if (!buttons.length && !panel) return;
   const key = 'perro-saved-dogs:v1';
-  const valid = function (slug) { return typeof slug === 'string' && /^[a-z0-9-]{1,120}$/.test(slug); };
+  const valid = function (slug) { return typeof slug === 'string' && /^[a-z0-9-]{1,512}$/.test(slug); };
   let saved = [], storageOK = true, generation = 0;
   const message = panel ? panel.querySelector('[data-saved-status]') : document.createElement('p');
   if (!panel) { message.className = 'saved-feedback'; message.setAttribute('role', 'status'); buttons[0].after(message); }
   const read = function () {
     try {
       const value = localStorage.getItem(key);
-      const parsed = value && value.length <= 13000 ? JSON.parse(value) : [];
+      const parsed = value && value.length <= 53000 ? JSON.parse(value) : [];
       saved = Array.isArray(parsed) ? Array.from(new Set(parsed.filter(valid))).slice(0, 100) : [];
       storageOK = true;
     } catch (_) { saved = []; storageOK = false; }
@@ -46,17 +46,29 @@
     if (!saved.length) { if (panel) message.textContent = 'Todavía no guardaste avisos en este navegador.'; return; }
     if (panel) message.textContent = 'Consultando el estado actual…';
     try {
-      const response = await fetch('/guardados/estado?slugs=' + encodeURIComponent(saved.join(',')), {cache:'no-store', credentials:'omit'});
-      if (!response.ok) throw Error('status');
-      const payload = await response.json();
-      if (current !== generation) return;
-      if (!Array.isArray(payload.items) || payload.items.length !== saved.length) throw Error('items');
+      const requested = saved.slice(), items = [];
+      // Keep even maximum-length saved slugs below web-server request-line limits.
+      for (let start = 0; start < requested.length;) {
+        if (current !== generation) return;
+        const batch = [];
+        while (start < requested.length && batch.length < 20) {
+          const candidate = batch.concat(requested[start]);
+          if (batch.length && ('/guardados/estado?slugs=' + encodeURIComponent(candidate.join(','))).length > 2400) break;
+          batch.push(requested[start++]);
+        }
+        const response = await fetch('/guardados/estado?slugs=' + encodeURIComponent(batch.join(',')), {cache:'no-store', credentials:'omit'});
+        if (!response.ok) throw Error('status');
+        const payload = await response.json();
+        if (current !== generation) return;
+        if (!Array.isArray(payload.items) || payload.items.length !== batch.length || batch.some(function (slug) { return !payload.items.some(function (entry) { return entry && entry.slug === slug; }); })) throw Error('items');
+        items.push(...payload.items);
+      }
       if (!panel) return;
       const list = panel.querySelector('[data-saved-list]');
       list.replaceChildren();
       const types = {adoption:'Adopción', lost:'Perdido', found:'Encontrado'};
-      saved.forEach(function (slug) {
-        const item = payload.items.find(function (entry) { return entry.slug === slug; });
+      requested.forEach(function (slug) {
+        const item = items.find(function (entry) { return entry.slug === slug; });
         if (!item) throw Error('item');
         const row = document.createElement('li');
         const description = document.createElement('p');

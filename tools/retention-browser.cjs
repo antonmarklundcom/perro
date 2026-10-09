@@ -55,6 +55,22 @@ async function run(){
   const second=await context.newPage();await second.goto(base+'/guardados');await second.locator('[data-saved-list] a').waitFor();await page.bringToFront();await page.locator('[data-save-dog="synthetic-browser-uno"]').click();await second.bringToFront();await second.waitForFunction(()=>document.querySelectorAll('[data-saved-list] li').length===0);check(width+' changes synchronize across tabs',true);await second.close();
   await context.close();
  }
+ // Reproduce the HTTP request-line limit without depending on the preview server's limits.
+ const manyContext=await browser.newContext({viewport:{width:375,height:900}});const many=await manyContext.newPage();const lines=[];
+ await many.route('**/guardados/estado?**',async route=>{const request=new URL(route.request().url());const length=Buffer.byteLength('GET '+request.pathname+request.search+' HTTP/1.1');lines.push({length,count:request.searchParams.get('slugs').split(',').length});if(length>8190)await route.fulfill({status:414,body:'Synthetic request-line limit'});else await route.continue();});
+ await many.goto(base+'/guardados');const longSlugs=Array.from({length:100},(_,i)=>'synthetic-long-'+'a'.repeat(65)+'-'+String(i).padStart(10,'0'));
+ check('unbatched100 normal maximum-length slugs exceed default request-line limit',Buffer.byteLength('GET /guardados/estado?slugs='+encodeURIComponent(longSlugs.join(','))+' HTTP/1.1')>8190);
+ await many.evaluate(({key,slugs})=>localStorage.setItem(key,JSON.stringify(slugs)),{key:storageKey,slugs:longSlugs});await many.reload();await many.waitForFunction(()=>document.querySelector('[data-saved-status]').textContent.startsWith('100 aviso(s)'),{},{timeout:15000});
+ check('100 saved references resolve under the simulated web-server limit',await many.locator('[data-saved-list] li').count()===100&&await many.locator('[data-saved-list] a').count()===0);
+ check('each saved-state request is bounded to20 slugs and below2500 bytes',lines.length>=5&&lines.every(line=>line.count<=20&&line.length<2500));
+ // Clear while one response is deliberately delayed; stale batches must never restore rows.
+ let delayed=false;await many.unroute('**/guardados/estado?**');await many.route('**/guardados/estado?**',async route=>{delayed=true;await new Promise(r=>setTimeout(r,250));await route.continue();});
+ await many.evaluate(()=>window.dispatchEvent(new Event('pageshow')));await many.waitForFunction(()=>document.querySelector('[data-saved-status]').textContent.includes('Consultando'));await many.locator('[data-saved-clear]').click();await many.waitForTimeout(400);
+ check('clearing during a batch prevents stale responses from restoring saved rows',delayed&&await many.locator('[data-saved-list] li').count()===0&&await many.evaluate(key=>localStorage.getItem(key)===null,storageKey));
+ await many.unroute('**/guardados/estado?**');const extended=[];await many.route('**/guardados/estado?**',async route=>{const request=new URL(route.request().url());extended.push(Buffer.byteLength('GET '+request.pathname+request.search+' HTTP/1.1'));await route.continue();});
+ const expandedSlugs=Array.from({length:5},(_,i)=>'synthetic-'+String(i)+'-'+'a'.repeat(500));await many.evaluate(({key,slugs})=>localStorage.setItem(key,JSON.stringify(slugs)),{key:storageKey,slugs:expandedSlugs});await many.reload();await many.waitForFunction(()=>document.querySelector('[data-saved-status]').textContent.startsWith('5 aviso(s)'),{},{timeout:15000});
+ check('expanded existing public slugs up to512 characters stay saveable',await many.locator('[data-saved-list] li').count()===5&&await many.evaluate(key=>JSON.parse(localStorage.getItem(key)).every(slug=>slug.length===512),storageKey));
+ check('long individual slugs are batched by encoded URL size',extended.length>=2&&extended.every(length=>length<2500));await manyContext.close();
  const context=await browser.newContext({viewport:{width:375,height:900}});const page=await context.newPage();await page.goto(base+'/perros');await page.locator('[data-save-dog="synthetic-browser-uno"]').click();
  phpRun("$dog=find_record('dogs','dog-browser-uno');$dog['status']='removed';$dog['updated_at']=now_iso();save_record('dogs',$dog);");
  await page.goto(base+'/guardados');await page.waitForFunction(()=>document.querySelector('[data-saved-list]').textContent.includes('ya no está disponible'));

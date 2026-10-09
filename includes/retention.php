@@ -54,7 +54,7 @@ function retention_routes(string $path): void
         $raw = $_GET['slugs'] ?? '';
         if (!is_string($raw) || strlen($raw) > 13000) { http_response_code(400); echo '{"error":"invalid_slugs"}'; exit; }
         $slugs = $raw === '' ? [] : array_values(array_unique(explode(',', $raw)));
-        if (count($slugs) > 100 || array_filter($slugs, static fn(string $slug): bool => preg_match('/^[a-z0-9-]{1,120}$/D', $slug) !== 1)) { http_response_code(400); echo '{"error":"invalid_slugs"}'; exit; }
+        if (count($slugs) > 100 || array_filter($slugs, static fn(string $slug): bool => preg_match('/^[a-z0-9-]{1,512}$/D', $slug) !== 1)) { http_response_code(400); echo '{"error":"invalid_slugs"}'; exit; }
         $json = json_encode(['items'=>retention_public_states($slugs)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'HEAD') echo $json;
         exit;

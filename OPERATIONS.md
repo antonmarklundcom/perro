@@ -72,3 +72,5 @@ Las pruebas utilizan copias temporales y datos sintéticos. Para PHP de Windows,
 ## Current reliability upgrade
 
 Read [schema-2 storage, role, owner-link and backup procedures](docs/development/2026-10-09/IMPLEMENTATION.md) before using the current release. Diagnostics are read-only; failed cleanup is retried explicitly; notification retry delays and worker claims are authoritative. This supersedes any older advice that missing installed datasets are initialized automatically.
+
+Preserve `storage/installation.json` outside `storage/data` during backup and recovery. It detects loss of the data directory. Do not delete either marker to bypass a 503; investigate the private source and retain its files. See the [follow-up review and verification](docs/development/2026-10-09/REVIEW-FIXES.md). Blocked cleanup jobs now yield to later jobs; empty-upload backup drills verify startup without executing archive code.

@@ -1,6 +1,6 @@
 # Local implementation verification — 9 October 2026
 
-Branch `codex/reliability-retention-20261009`, based on merged main `46b3297e8995b85e00d38f06272f6d96ed604a03`. Results apply to the reviewed implementation committed with this report. All mutation, account, delivery and recovery checks used disposable synthetic copies; no production data, real recipient or hosting account was used.
+Branch `codex/reliability-retention-20261009`, based on merged main `46b3297e8995b85e00d38f06272f6d96ed604a03`. The initial results below apply to commit b3280bdb38032917d9b9847f07d935043dab4785. The [follow-up review](REVIEW-FIXES.md) records the expanded checks after the additional fixes; unchanged suites were not repeated locally without a reason. All mutation, account, delivery and recovery checks used disposable synthetic copies; no production data, real recipient or hosting account was used.
 
 | Check | Result |
 | --- | --- |

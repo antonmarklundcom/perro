@@ -59,40 +59,139 @@ function storage_recover_transaction(): void
     if (function_exists('clear_dataset_cache')) clear_dataset_cache();
 }
 
+function storage_read_state(string $file): ?array
+{
+    if (!file_exists($file) && !is_link($file)) return null;
+    $state = is_file($file) && !is_link($file) ? json_decode((string) file_get_contents($file), true) : null;
+    if (!is_array($state) || !is_int($state['schema_version'] ?? null) || $state['schema_version'] < 1 || $state['schema_version'] > PERRO_STORAGE_SCHEMA) throw new RuntimeException('Estado del almacenamiento inválido o incompatible.');
+    return $state;
+}
+
+// This beacon survives loss of storage/data, unlike the inner schema marker.
+function storage_read_installation(string $root): ?array
+{
+    $file = $root . '/storage/installation.json';
+    if (!file_exists($file) && !is_link($file)) return null;
+    $marker = is_file($file) && !is_link($file) ? json_decode((string) file_get_contents($file), true) : null;
+    if (!is_array($marker) || ($marker['format'] ?? '') !== 'perro-installation-v1'
+        || ($marker['schema_version'] ?? null) !== PERRO_STORAGE_SCHEMA
+        || !in_array($marker['phase'] ?? '', ['initializing', 'installed'], true)
+        || !is_string($marker['initialized_at'] ?? null) || strtotime($marker['initialized_at']) === false) throw new RuntimeException('Marcador de instalación inválido o incompatible.');
+    return $marker;
+}
+
+function storage_write_installation(string $phase, string $initialized): void
+{
+    if (!storage_write_json(PERRO_STORAGE . '/installation.json', ['format'=>'perro-installation-v1', 'schema_version'=>PERRO_STORAGE_SCHEMA, 'phase'=>$phase, 'initialized_at'=>$initialized])) throw new RuntimeException('No se pudo registrar la instalación.');
+}
+
+// Only our explicitly marked, empty initialization may fill missing datasets.
+// Uploaded files, unknown paths, journals and nonempty records are never reset.
+function storage_assert_empty_initialization(bool $resume): void
+{
+    $storageEntries = @scandir(PERRO_STORAGE); $uploadEntries = @scandir(PERRO_UPLOADS); $dataEntries = @scandir(PERRO_DATA);
+    if ($storageEntries === false || $uploadEntries === false || $dataEntries === false) throw new RuntimeException('No se puede verificar que el almacenamiento nuevo esté vacío.');
+    foreach ($storageEntries as $entry) {
+        if (in_array($entry, ['.', '..'], true)) continue;
+        $file = PERRO_STORAGE . '/' . $entry;
+        if (is_link($file)) throw new RuntimeException('Hay almacenamiento existente que requiere revisión.');
+        if (in_array($entry, ['data', 'uploads'], true) && is_dir($file)) continue;
+        if ($entry === '.htaccess' && is_file($file)) continue;
+        if ($resume && $entry === 'installation.json') continue;
+        if ($resume && preg_match('/^installation\.json\.tmp-[a-f0-9]{12}$/D', $entry) && is_file($file)) {
+            $temporary = json_decode((string) file_get_contents($file), true);
+            if (is_array($temporary) && ($temporary['format'] ?? '') === 'perro-installation-v1' && ($temporary['schema_version'] ?? null) === PERRO_STORAGE_SCHEMA && in_array($temporary['phase'] ?? '', ['initializing', 'installed'], true)) continue;
+        }
+        throw new RuntimeException('Hay almacenamiento existente que requiere revisión.');
+    }
+    foreach ($uploadEntries as $entry) {
+        if (in_array($entry, ['.', '..'], true)) continue;
+        $file = PERRO_UPLOADS . '/' . $entry;
+        if ($entry !== '.gitkeep' || !is_file($file) || is_link($file) || filesize($file) !== 0) throw new RuntimeException('Hay fotos existentes; no se puede inicializar el almacenamiento.');
+    }
+    $datasets = array_map(static fn(string $name): string => $name . '.json', storage_dataset_names());
+    foreach ($dataEntries as $entry) {
+        if (in_array($entry, ['.', '..'], true)) continue;
+        $file = PERRO_DATA . '/' . $entry;
+        if (!is_file($file) || is_link($file)) throw new RuntimeException('Ruta de inicialización inválida.');
+        if ($entry === 'application.lock' && filesize($file) === 0) continue;
+        $original = preg_replace('/\.tmp-[a-f0-9]{12}$/D', '', $entry);
+        if ($resume && $original === 'storage-state.json') {
+            $state = storage_read_state($file);
+            if (($state['schema_version'] ?? null) === PERRO_STORAGE_SCHEMA) continue;
+        }
+        if ($resume && in_array($original, $datasets, true)) {
+            $rows = json_decode((string) file_get_contents($file), true);
+            storage_validate_records($original, $rows);
+            if ($rows === []) continue;
+        }
+        throw new RuntimeException('No se puede reanudar una inicialización con datos existentes.');
+    }
+}
+
+// Read-only startup invariants for a restored installation; executes no code
+// from the archive and does not create a beacon, lock, schema or empty dataset.
+function storage_assert_installed(string $root, bool $requireBeacon = true): void
+{
+    foreach (['storage', 'storage/data', 'storage/uploads'] as $directory) if (!is_dir($root . '/' . $directory)) throw new RuntimeException('Falta una carpeta del almacenamiento instalado.');
+    $marker = storage_read_installation($root);
+    if (($requireBeacon && !$marker) || ($marker && $marker['phase'] !== 'installed')) throw new RuntimeException('La instalación no está completa.');
+    $state = storage_read_state($root . '/storage/data/storage-state.json');
+    if (($state['schema_version'] ?? null) !== PERRO_STORAGE_SCHEMA) throw new RuntimeException('Falta el estado del almacenamiento instalado.');
+    foreach (storage_dataset_names() as $name) {
+        $file = $root . '/storage/data/' . $name . '.json';
+        if (!is_file($file)) throw new RuntimeException('Falta un dataset del almacenamiento instalado: ' . $name);
+        storage_validate_records($name, json_decode((string) file_get_contents($file), true));
+    }
+}
+
 function storage_prepare(): void
 {
-    $stateFile = PERRO_DATA . '/storage-state.json';
-    if (is_file($stateFile) && (!is_dir(PERRO_DATA) || !is_dir(PERRO_UPLOADS))) throw new RuntimeException('Falta una carpeta del almacenamiento instalado.');
+    $stateFile = PERRO_DATA . '/storage-state.json'; $marker = storage_read_installation(PERRO_ROOT);
+    $legacyEvidence = is_file($stateFile) || is_file(PERRO_DATA . '/transaction.json')
+        || array_filter(storage_dataset_names(), static fn(string $name): bool => file_exists(PERRO_DATA . '/' . $name . '.json'));
+    if (($marker && $marker['phase'] === 'installed') || $legacyEvidence) {
+        if (!is_dir(PERRO_DATA) || !is_dir(PERRO_UPLOADS)) throw new RuntimeException('Falta una carpeta del almacenamiento instalado.');
+    }
+    if ($marker && $marker['phase'] === 'installed' && !is_file($stateFile)) throw new RuntimeException('Falta el estado del almacenamiento instalado.');
     foreach ([PERRO_STORAGE, PERRO_DATA, PERRO_UPLOADS] as $directory) {
         if (!is_dir($directory) && !@mkdir($directory, 0755, true) && !is_dir($directory)) throw new RuntimeException('No se pudo preparar el almacenamiento.');
     }
     $handle = @fopen(PERRO_DATA . '/application.lock', 'c+');
     if (!$handle || !flock($handle, LOCK_EX)) throw new RuntimeException('No se pudo bloquear el almacenamiento.');
     try {
-        $state = is_file($stateFile) ? json_decode((string) file_get_contents($stateFile), true) : null;
-        if ($state !== null && (!is_array($state) || !is_int($state['schema_version'] ?? null) || $state['schema_version'] < 1 || $state['schema_version'] > PERRO_STORAGE_SCHEMA)) throw new RuntimeException('Versión de almacenamiento incompatible.');
-        if (is_file($stateFile) && $state === null) throw new RuntimeException('Estado del almacenamiento inválido.');
-        storage_recover_transaction();
-        $names = storage_dataset_names(); $base = array_slice($names, 0, 8);
-        $present = array_values(array_filter($base, static fn(string $name): bool => is_file(PERRO_DATA . '/' . $name . '.json')));
-        $fresh = $state === null && !$present && !(glob(PERRO_DATA . '/*.json') ?: []);
-        if (!$fresh) {
-            $required = ($state['schema_version'] ?? 1) === PERRO_STORAGE_SCHEMA ? $names : $base;
+        $marker = storage_read_installation(PERRO_ROOT); $state = storage_read_state($stateFile);
+        $names = storage_dataset_names();
+        if ($marker && $marker['phase'] === 'installed') {
+            if (($state['schema_version'] ?? null) !== PERRO_STORAGE_SCHEMA) throw new RuntimeException('Falta el estado del almacenamiento instalado.');
+            storage_recover_transaction();
+            foreach ($names as $name) if (!is_file(PERRO_DATA . '/' . $name . '.json')) throw new RuntimeException('Falta un dataset del almacenamiento instalado: ' . $name);
+            return;
+        }
+        $legacy = !$marker && ($state !== null || is_file(PERRO_DATA . '/transaction.json')
+            || array_filter($names, static fn(string $name): bool => file_exists(PERRO_DATA . '/' . $name . '.json')));
+        if ($legacy) {
+            storage_recover_transaction();
+            $required = ($state['schema_version'] ?? 1) === PERRO_STORAGE_SCHEMA ? $names : array_slice($names, 0, 8);
+            // Validate every existing dataset before adding the beacon or files.
             foreach ($required as $name) if (!is_file(PERRO_DATA . '/' . $name . '.json')) throw new RuntimeException('Falta un dataset del almacenamiento instalado: ' . $name);
-            // Validate an unversioned/v1 installation before adding known new datasets.
-            if (($state['schema_version'] ?? 1) < PERRO_STORAGE_SCHEMA) {
-                foreach ($base as $name) storage_validate_records($name, json_decode((string) file_get_contents(PERRO_DATA . '/' . $name . '.json'), true));
+            foreach ($names as $name) if (is_file(PERRO_DATA . '/' . $name . '.json')) storage_validate_records($name, json_decode((string) file_get_contents(PERRO_DATA . '/' . $name . '.json'), true));
+        } else {
+            storage_assert_empty_initialization($marker !== null);
+            if (!$marker) {
+                storage_write_installation('initializing', date(DATE_ATOM));
+                $marker = storage_read_installation(PERRO_ROOT);
             }
         }
-        if ($fresh || ($state['schema_version'] ?? 1) < PERRO_STORAGE_SCHEMA) {
-            foreach ($names as $name) {
-                $file = PERRO_DATA . '/' . $name . '.json';
-                if (is_file($file)) storage_validate_records($name, json_decode((string) file_get_contents($file), true));
-                elseif (!storage_write_json($file, [])) throw new RuntimeException('No se pudo inicializar un dataset nuevo.');
-            }
-            $newState = ['schema_version'=>PERRO_STORAGE_SCHEMA, 'initialized_at'=>$state['initialized_at'] ?? date(DATE_ATOM), 'upgraded_at'=>date(DATE_ATOM)];
-            if (!storage_write_json($stateFile, $newState)) throw new RuntimeException('No se pudo registrar la versión del almacenamiento.');
+        foreach ($names as $name) {
+            $file = PERRO_DATA . '/' . $name . '.json';
+            if (!is_file($file) && !storage_write_json($file, [])) throw new RuntimeException('No se pudo inicializar un dataset nuevo.');
         }
+        if (($state['schema_version'] ?? null) !== PERRO_STORAGE_SCHEMA) {
+            $state = ['schema_version'=>PERRO_STORAGE_SCHEMA, 'initialized_at'=>$state['initialized_at'] ?? $marker['initialized_at'] ?? date(DATE_ATOM), 'upgraded_at'=>date(DATE_ATOM)];
+            if (!storage_write_json($stateFile, $state)) throw new RuntimeException('No se pudo registrar la versión del almacenamiento.');
+        }
+        storage_write_installation('installed', $marker['initialized_at'] ?? $state['initialized_at'] ?? date(DATE_ATOM));
     } finally { flock($handle, LOCK_UN); fclose($handle); }
 }
 
@@ -100,7 +199,7 @@ function storage_prepare(): void
 function storage_doctor(string $root): array
 {
     $data = $root . '/storage/data'; $uploads = $root . '/storage/uploads';
-    $result = ['mode'=>'read-only', 'schema_version'=>null, 'counts'=>[], 'issues'=>[]];
+    $result = ['mode'=>'read-only', 'schema_version'=>null, 'installation_phase'=>null, 'counts'=>[], 'issues'=>[]];
     $issue = static function (string $dataset, string $code, ?string $id = null) use (&$result): void {
         $entry = ['dataset'=>$dataset, 'code'=>$code]; if ($id !== null) $entry['id'] = $id; $result['issues'][] = $entry;
     };
@@ -108,11 +207,18 @@ function storage_doctor(string $root): array
     if ($handle && !flock($handle, LOCK_SH)) { fclose($handle); throw new RuntimeException('No se pudo bloquear la lectura del diagnóstico.'); }
     try {
         if (!$handle) $issue('storage', 'missing_lock');
+        foreach ([$data, $uploads] as $directory) if (!is_dir($directory)) $issue('storage', 'missing_' . basename($directory) . '_directory');
+        try {
+            $marker = storage_read_installation($root);
+            $result['installation_phase'] = $marker['phase'] ?? 'legacy';
+            if ($marker && $marker['phase'] !== 'installed') $issue('storage', 'incomplete_installation');
+        } catch (Throwable $error) { $issue('storage', 'invalid_installation_marker'); }
         $state = is_file($data . '/storage-state.json') ? json_decode((string) file_get_contents($data . '/storage-state.json'), true) : null;
         $version = is_array($state) ? ($state['schema_version'] ?? null) : null;
         $result['schema_version'] = $version;
         if (!is_file($data . '/storage-state.json')) $issue('storage', 'unversioned');
         elseif (!is_int($version) || $version < 1 || $version > PERRO_STORAGE_SCHEMA) $issue('storage', 'incompatible_version');
+        if (($marker['phase'] ?? '') === 'installed' && $version !== PERRO_STORAGE_SCHEMA) $issue('storage', 'missing_installed_state');
         if (is_file($data . '/transaction.json')) $issue('storage', 'pending_transaction');
         $tables = [];
         foreach (storage_dataset_names() as $name) {

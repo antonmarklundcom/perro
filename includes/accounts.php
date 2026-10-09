@@ -21,17 +21,18 @@ function persist_admin_account(array $account, string $action): void
     if (!commit_datasets(['settings'=>$settings, 'moderation'=>$events])) throw new RuntimeException('No se pudo guardar la cuenta.');
 }
 
-function invite_admin_account(string $email, string $name): array
+function invite_admin_account(string $email, string $name, string $role = 'moderator'): array
 {
-    return with_data_lock(static function () use ($email, $name): array {
-        if (!is_admin() || current_admin_account_id() !== 'admin') return ['error', 'Solo la cuenta principal puede administrar accesos.'];
+    return with_data_lock(static function () use ($email, $name, $role): array {
+        if (!admin_has_capability('manage_accounts')) return ['error', 'Solo la cuenta principal puede administrar accesos.'];
+        if (!array_key_exists($role, admin_role_options())) return ['error', 'Elegí un rol válido.'];
         $email = strtolower(trim($email));
         if (strlen($email) > 180 || !filter_var($email, FILTER_VALIDATE_EMAIL) || $name === '') return ['error', 'Completá un correo válido y un nombre.'];
         $id = 'admin-user-' . hash('sha256', $email);
         $existing = find_record('settings', $id);
         if (!empty($existing['active']) && empty($existing['disabled'])) return ['error', 'Este correo ya tiene una cuenta activa.'];
         $token = bin2hex(random_bytes(32));
-        $record = ['id'=>$id, 'email'=>$email, 'name'=>$name, 'active'=>false, 'disabled'=>false, 'invite_hash'=>hash('sha256', $token), 'invite_expires_at'=>time()+86400, 'created_at'=>$existing['created_at'] ?? now_iso(), 'updated_at'=>now_iso()];
+        $record = ['id'=>$id, 'email'=>$email, 'name'=>$name, 'role'=>$role, 'active'=>false, 'disabled'=>false, 'invite_hash'=>hash('sha256', $token), 'invite_expires_at'=>time()+86400, 'created_at'=>$existing['created_at'] ?? now_iso(), 'updated_at'=>now_iso()];
         persist_admin_account($record, 'admin_account_invited');
         return ['success', 'Invitación creada. Compartí el enlace únicamente con la persona invitada.', app_url('activar-admin?token=' . $token)];
     });
@@ -90,17 +91,19 @@ function change_admin_password(string $current, string $new, string $confirm): a
 function admin_account_routes(string $path): void
 {
     if ($path === 'admin/accounts') {
-        require_admin();
-        if (current_admin_account_id() !== 'admin') { render_error_page('Acceso restringido', 'Solo la cuenta principal puede crear o retirar accesos.', 403); exit; }
+        require_admin_capability('manage_accounts');
         if (method_is_post()) {
             require_csrf();
             if (text('action', 30) === 'invite') {
-                $result = invite_admin_account(text('email', 180), text('name', 80));
+                $result = invite_admin_account(text('email', 180), text('name', 80), text('role', 30) ?: 'moderator');
                 if (isset($result[2])) $_SESSION['admin_invite_link'] = $result[2];
+                set_flash($result[0], $result[1]);
+            } elseif (text('action', 30) === 'role') {
+                $result = change_admin_role(text('id', 100), text('role', 30));
                 set_flash($result[0], $result[1]);
             } elseif (text('action', 30) === 'disable') {
                 $result = with_data_lock(static function (): array {
-                    if (!is_admin() || current_admin_account_id() !== 'admin') return ['error', 'La sesión venció.'];
+                    if (!admin_has_capability('manage_accounts')) return ['error', 'La sesión venció.'];
                     $id = text('id', 100);
                     $account = str_starts_with($id, 'admin-user-') ? find_record('settings', $id) : null;
                     if (!$account) return ['error', 'La cuenta no existe.'];
@@ -118,10 +121,10 @@ function admin_account_routes(string $path): void
         $inviteLink = $_SESSION['admin_invite_link'] ?? '';
         unset($_SESSION['admin_invite_link']);
         render_header(page_meta('Cuentas de administración | Perro', 'Gestión privada de accesos.', 'admin/accounts', false));
-        ?><section class="section"><div class="shell narrow"><a class="text-link" href="/admin">← Volver al panel</a><h1>Cuentas de administración</h1><p>Cada persona usa su correo y su propia contraseña. Puede revisar, editar y publicar fichas, gestionar reportes y cambiar su contraseña. Solo la cuenta principal puede invitar personas o retirar accesos.</p>
+        ?><section class="section"><div class="shell narrow"><a class="text-link" href="/admin">← Volver al panel</a><h1>Cuentas de administración</h1><p>Cada persona usa su correo y su propia contraseña. Puede revisar, editar y publicar fichas, gestionar reportes y cambiar su contraseña. Moderación no permite exportar datos privados ni suprimir registros permanentemente. Gestión agrega esos permisos. Solo la cuenta principal puede invitar personas, cambiar roles o retirar accesos. Las cuentas anteriores conservan Moderación hasta que la cuenta principal les asigne otro rol.</p>
         <?php if ($inviteLink): ?><div class="notice"><label>Enlace privado de activación<input readonly value="<?= h($inviteLink) ?>" autocomplete="off"></label><p>Copialo y compartilo por un canal privado. Vence en 24 horas y funciona una sola vez. La persona invitada elige su contraseña. El enlace se muestra una sola vez. No enviamos correos automáticamente.</p></div><?php endif; ?>
-        <form class="submission-form account-form" method="post" action="/admin/accounts"><?= csrf_field() ?><input type="hidden" name="action" value="invite"><fieldset><legend>Invitar una persona</legend><label>Nombre<input name="name" required maxlength="80" autocomplete="off"></label><label>Correo para ingresar<input type="email" name="email" required maxlength="180" autocomplete="off"></label><button class="button" type="submit">Crear enlace de activación</button></fieldset></form>
-        <h2>Accesos del equipo</h2><div class="admin-list"><?php foreach (admin_accounts() as $account): ?><article class="admin-card"><div><h3><?= h($account['name']) ?></h3><p><?= h($account['email']) ?></p><span class="status-pill"><?= !empty($account['disabled']) ? 'Acceso retirado' : (!empty($account['active']) ? 'Activa' : (($account['invite_expires_at'] ?? 0) > time() ? 'Pendiente de activación' : 'Invitación vencida')) ?></span></div><div class="admin-card-actions"><?php if (empty($account['active'])): ?><form method="post" action="/admin/accounts"><?= csrf_field() ?><input type="hidden" name="action" value="invite"><input type="hidden" name="email" value="<?= h($account['email']) ?>"><input type="hidden" name="name" value="<?= h($account['name']) ?>"><button class="button button-small" type="submit">Crear nuevo enlace</button></form><?php endif; ?><?php if (empty($account['disabled'])): ?><form method="post" action="/admin/accounts"><?= csrf_field() ?><input type="hidden" name="action" value="disable"><input type="hidden" name="id" value="<?= h($account['id']) ?>"><button class="button button-small button-danger" type="submit">Retirar acceso</button></form><?php endif; ?></div></article><?php endforeach; ?></div><p class="date-note">La cuenta principal «admin» se conserva y no se puede retirar desde esta página.</p></div></section><?php
+        <form class="submission-form account-form" method="post" action="/admin/accounts"><?= csrf_field() ?><input type="hidden" name="action" value="invite"><fieldset><legend>Invitar una persona</legend><label>Nombre<input name="name" required maxlength="80" autocomplete="off"></label><label>Correo para ingresar<input type="email" name="email" required maxlength="180" autocomplete="off"></label><label>Rol<select name="role"><?php select_options(admin_role_options(), 'moderator'); ?></select></label><button class="button" type="submit">Crear enlace de activación</button></fieldset></form>
+        <h2>Accesos del equipo</h2><div class="admin-list"><?php foreach (admin_accounts() as $account): ?><article class="admin-card"><div><h3><?= h($account['name']) ?></h3><p><?= h($account['email']) ?></p><span class="status-pill"><?= !empty($account['disabled']) ? 'Acceso retirado' : (!empty($account['active']) ? 'Activa' : (($account['invite_expires_at'] ?? 0) > time() ? 'Pendiente de activación' : 'Invitación vencida')) ?></span></div><div class="admin-card-actions"><form method="post" action="/admin/accounts"><?= csrf_field() ?><input type="hidden" name="action" value="role"><input type="hidden" name="id" value="<?= h($account['id']) ?>"><label>Rol<select name="role"><?php select_options(admin_role_options(), admin_account_role($account)); ?></select></label><button class="button button-small" type="submit">Guardar rol</button></form><?php if (empty($account['active'])): ?><form method="post" action="/admin/accounts"><?= csrf_field() ?><input type="hidden" name="action" value="invite"><input type="hidden" name="role" value="<?= h(admin_account_role($account)) ?>"><input type="hidden" name="email" value="<?= h($account['email']) ?>"><input type="hidden" name="name" value="<?= h($account['name']) ?>"><button class="button button-small" type="submit">Crear nuevo enlace</button></form><?php endif; ?><?php if (empty($account['disabled'])): ?><form method="post" action="/admin/accounts"><?= csrf_field() ?><input type="hidden" name="action" value="disable"><input type="hidden" name="id" value="<?= h($account['id']) ?>"><button class="button button-small button-danger" type="submit">Retirar acceso</button></form><?php endif; ?></div></article><?php endforeach; ?></div><p class="date-note">La cuenta principal «admin» se conserva y no se puede retirar desde esta página.</p></div></section><?php
         render_footer(); exit;
     }
     if ($path === 'activar-admin') {

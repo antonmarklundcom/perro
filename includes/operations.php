@@ -1,13 +1,14 @@
 <?php
 
 declare(strict_types=1);
+require_once __DIR__ . '/reliability.php';
 
 function operation_routes(string $path): void
 {
     if ($path === 'health') {
         header('Cache-Control: no-store'); header('Content-Type: application/json; charset=utf-8');
         with_data_read_lock(static function (): void {
-            foreach (['dogs', 'submissions', 'reports', 'moderation', 'settings', 'security', 'archive', 'notifications'] as $name) read_dataset($name);
+            foreach (storage_dataset_names() as $name) read_dataset($name);
             foreach ([PERRO_DATA, PERRO_UPLOADS] as $directory) {
                 $probe = $directory . '/.health-' . bin2hex(random_bytes(6));
                 $handle = @fopen($probe, 'x');
@@ -42,11 +43,12 @@ function operation_routes(string $path): void
         header('Cache-Control: no-store'); header('Location: ' . listing_contact_url($dog), true, 302); exit;
     }
     if ($path === 'admin/delete' && method_is_post()) {
-        require_admin(); require_csrf();
+        require_admin_capability('permanent_delete'); require_csrf();
         if (!checked('delete_confirm')) { set_flash('error', 'Confirmá la supresión después de verificar la solicitud.'); redirect('admin'); }
         $id = text('id', 100);
         delete_listing_data($id);
-        set_flash('success', 'Se eliminaron la ficha, contactos, reportes vinculados, notas, cachés y fotos. Revisá por separado los respaldos y las copias externas.'); redirect('admin');
+        $pending = array_filter(read_dataset('cleanup'), static fn(array $j): bool => ($j['status'] ?? '') === 'pending');
+        set_flash($pending ? 'warning' : 'success', $pending ? 'Se eliminaron los datos del aviso. Hay limpieza de archivos pendiente: el responsable técnico debe revisarla.' : 'Se eliminaron los datos y archivos del aviso. Revisá por separado los respaldos y las copias externas.'); redirect('admin');
     }
 }
 
@@ -114,13 +116,11 @@ function notification_text(array $item): string
 function dispatch_notifications(callable $sender): int
 {
     $sent = 0;
-    foreach (read_dataset('notifications') as $item) {
-        if ($item['status'] !== 'pending') continue;
+    for ($i = 0; $i < 50; $i++) {
+        $item = claim_notification();
+        if ($item === null) break;
         try { $ok = $sender(notification_text($item)); } catch (Throwable $error) { $ok = false; }
-        if ($ok) {
-            $item['status'] = 'sent'; $item['sent_at'] = now_iso();
-            if (save_record('notifications', $item)) $sent++;
-        }
+        if (finish_notification($item, $ok) && $ok) $sent++;
     }
     return $sent;
 }
@@ -138,14 +138,14 @@ function render_archived_record(array $entry): void
         return;
     }
     $record = normalize_record($entry['dataset'], $entry['record']);
-    ?><article class="admin-card"><div><span class="status-pill">Archivo · <?= h(record_status_label($record['status'])) ?></span><h3><?= h($record['name'] ?? $record['dog_name']) ?></h3><p><?= h($record['city']) ?> · Ref. <?= h($record['reference']) ?> · <?= h($record['whatsapp']) ?></p><p>Contacto privado: <?= h($record['submitter_name']) ?> · <?= h($record['email']) ?></p><p><?= h($record['internal_note']) ?></p><small>Archivado el <?= h(format_date($entry['archived_at'])) ?></small></div><form method="post" action="/admin/delete"><?= csrf_field() ?><input type="hidden" name="id" value="<?= h($record['id']) ?>"><label class="check"><input type="checkbox" name="delete_confirm" value="1" required> Verifiqué la solicitud y confirmo eliminar sus datos y fotos.</label><button class="button button-danger" type="submit">Eliminar datos</button></form></article><?php
+    ?><article class="admin-card"><div><span class="status-pill">Archivo · <?= h(record_status_label($record['status'])) ?></span><h3><?= h($record['name'] ?? $record['dog_name']) ?></h3><p><?= h($record['city']) ?> · Ref. <?= h($record['reference']) ?> · <?= h($record['whatsapp']) ?></p><p>Contacto privado: <?= h($record['submitter_name']) ?> · <?= h($record['email']) ?></p><p><?= h($record['internal_note']) ?></p><small>Archivado el <?= h(format_date($entry['archived_at'])) ?></small></div><?php if (admin_has_capability('permanent_delete')): ?><form method="post" action="/admin/delete"><?= csrf_field() ?><input type="hidden" name="id" value="<?= h($record['id']) ?>"><label class="check"><input type="checkbox" name="delete_confirm" value="1" required> Verifiqué la solicitud y confirmo eliminar sus datos y fotos.</label><button class="button button-danger" type="submit">Eliminar datos</button></form><?php endif; ?></article><?php
 }
 
 function delete_listing_data(string $id): void
 {
     $folders = with_data_lock(static function () use ($id): array {
         $datasets = [];
-        foreach (['dogs', 'submissions', 'reports', 'moderation', 'archive', 'notifications'] as $name) $datasets[$name] = read_dataset($name);
+        foreach (['dogs', 'submissions', 'reports', 'moderation', 'archive', 'notifications', 'owner_actions', 'cleanup'] as $name) $datasets[$name] = read_dataset($name);
         $ids = [$id]; $folders = []; $references = [];
         $listings = array_merge($datasets['dogs'], $datasets['submissions'], array_column($datasets['archive'], 'record'));
         // Resolve both directions, including archived source records.
@@ -170,9 +170,9 @@ function delete_listing_data(string $id): void
         }));
         unset($records);
         $datasets['moderation'][] = ['id'=>random_id('mod-'), 'action'=>'data_deleted', 'record_id'=>'', 'note'=>'', 'admin'=>current_admin_account_id(), 'created_at'=>now_iso()];
+        $datasets['cleanup'][] = ['id'=>random_id('cleanup-'), 'folders'=>array_values(array_unique($folders)), 'created_at'=>now_iso(), 'status'=>'pending', 'attempts'=>0];
         if (!commit_datasets($datasets)) throw new RuntimeException('No se pudo guardar la supresión.');
         return array_unique($folders);
     });
-    foreach ($folders as $folder) remove_upload_folder($folder);
-    foreach (glob(PERRO_STORAGE . '/cache/share-*.jpg') ?: [] as $file) @unlink($file);
+    run_cleanup_jobs();
 }

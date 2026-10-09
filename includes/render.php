@@ -116,6 +116,7 @@ function render_header(array $meta): void
     <?php render_public_schema($meta); ?>
     <meta name="theme-color" content="#193d32">
     <meta name="perro-release" content="<?= h(perro_release_id()) ?>">
+    <link rel="alternate" type="application/rss+xml" title="Avisos vigentes de Perro" href="<?= h(app_url('avisos.rss')) ?>">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="<?= h(asset_url('assets/css/site.css')) ?>">
 </head>
@@ -134,6 +135,7 @@ function render_header(array $meta): void
             <?php else: ?>
             <a href="/perros"<?= in_array(request_path(), ['perros', 'cachorros-en-adopcion', 'perros-de-raza-en-adopcion'], true) ? ' aria-current="page"' : '' ?>>Adoptá</a>
             <a href="/perros-perdidos-paraguay"<?= request_path() === 'perros-perdidos-paraguay' ? ' aria-current="page"' : '' ?>>Perdidos y encontrados</a>
+            <a href="/guardados"<?= request_path() === 'guardados' ? ' aria-current="page"' : '' ?>>Guardados</a>
             <a href="/como-funciona"<?= request_path() === 'como-funciona' ? ' aria-current="page"' : '' ?>>Cómo funciona</a>
             <?php if (!$isAdminPage && $whatsappUrl): ?><a class="nav-whatsapp" href="<?= h($whatsappUrl) ?>" target="_blank" rel="noopener noreferrer">WhatsApp</a><?php endif; ?>
             <a class="button button-small button-coral" href="/dar-perro-en-adopcion">Publicá un aviso</a>
@@ -172,7 +174,7 @@ function render_footer(): void
             <h2>Información</h2>
             <a href="/como-funciona">Cómo publicar y actualizar un aviso</a>
             <a href="/seguridad">Adopción segura</a>
-            <a href="/guias-adopcion">Guías para adoptar y ayudar</a>
+            <a href="/avisos.rss">Avisos por RSS</a><a href="/guias-adopcion">Guías para adoptar y ayudar</a>
             <a href="/apoyar">Cómo apoyar Perro</a>
             <a href="/terminos">Términos</a>
             <a href="/privacidad">Privacidad</a>
@@ -230,6 +232,7 @@ function dog_card(array $dog): void
         <span class="text-link">Conocé su historia <span aria-hidden="true">→</span></span>
     </div>
     </a>
+    <?php retention_save_button($dog); ?>
 </article><?php
 }
 

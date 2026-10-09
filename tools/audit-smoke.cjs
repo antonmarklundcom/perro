@@ -115,6 +115,8 @@ async function run(){
  check('photo retry explicitly asks to select photos again',(await visitor('/dar-perro-en-adopcion')).html.includes('foto'));
  const notify=read('notifications');check('report queued a notification without personal data',notify.some(n=>n.event==='report')&&!JSON.stringify(notify).includes('PRIVATE PERSON'));
  check('failed notification sender leaves retryable events',JSON.parse(localPHP('echo json_encode(dispatch_notifications(static fn($s)=>false));'))===0&&read('notifications').some(n=>n.status==='pending'));
+ check('notification retry is delayed instead of immediately re-sent',Number(localPHP('echo dispatch_notifications(static fn(string $body): bool => true);'))===0);
+ localPHP('with_data_lock(static function(): void {$items=read_dataset("notifications");foreach($items as &$item)if($item["status"]==="pending")$item["retry_after"]=0;unset($item);commit_datasets(["notifications"=>$items]);});');
  check('notification sender test dispatches queued event',JSON.parse(localPHP('echo json_encode(dispatch_notifications(static fn($s)=>str_contains($s,"/admin")&&!str_contains($s,"PRIVATE")));'))>=1);
  const old=read('dogs');old[2].status='removed';old[2].updated_at='2020-01-01T00:00:00Z';old[2].expires_at='2020-01-01T00:00:00Z';write('dogs',old);
  const maintenance=args=>execFileSync(php,[...gd,'tools/maintenance.php',...args],{cwd:copy,encoding:'utf8',windowsHide:true});

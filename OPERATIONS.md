@@ -68,3 +68,7 @@ node tools/audit-smoke.cjs
 ```
 
 Las pruebas utilizan copias temporales y datos sintéticos. Para PHP de Windows, `PERRO_PHP_BIN` selecciona el ejecutable y `PERRO_PHP_GD_DIR` habilita GD cuando está instalado pero desactivado. `PERRO_PHP_EXIF=1` habilita EXIF si está disponible. No cambian los datos del repositorio ni llaman al sitio real.
+
+## Current reliability upgrade
+
+Read [schema-2 storage, role, owner-link and backup procedures](docs/development/2026-10-09/IMPLEMENTATION.md) before using the current release. Diagnostics are read-only; failed cleanup is retried explicitly; notification retry delays and worker claims are authoritative. This supersedes any older advice that missing installed datasets are initialized automatically.

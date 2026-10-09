@@ -11,6 +11,7 @@ require __DIR__ . '/includes/accounts.php';
 require __DIR__ . '/includes/experience.php';
 require __DIR__ . '/includes/sharing.php';
 require __DIR__ . '/includes/guidance.php';
+require __DIR__ . '/includes/editorial.php';
 require __DIR__ . '/includes/workflows.php';
 require __DIR__ . '/includes/admin-panel.php';
 require __DIR__ . '/includes/operations.php';
@@ -28,7 +29,8 @@ operation_routes($path);
 
 if ($path === 'robots.txt') {
     header('Content-Type: text/plain; charset=utf-8');
-    echo "User-agent: *\nAllow: /\nSitemap: " . app_url('sitemap.xml') . "\n";
+    if (empty($config['indexing_enabled'])) echo "User-agent: *\nDisallow: /\n";
+    else echo "User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /activar-admin\nDisallow: /storage/\nDisallow: /includes/\nDisallow: /tools/\nDisallow: /docs/\nDisallow: /enviar-perro\nDisallow: /reportar\nDisallow: /gracias\nDisallow: /contactar/\nDisallow: /compartir/\nDisallow: /health\nSitemap: " . app_url('sitemap.xml') . "\n";
     exit;
 }
 
@@ -37,8 +39,10 @@ if ($path === 'sitemap.xml') {
     echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
     echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
     $routes = ['', 'perros', 'cachorros-en-adopcion', 'perros-de-raza-en-adopcion', 'perros-perdidos-paraguay', 'dar-perro-en-adopcion', 'como-funciona', 'seguridad', 'privacidad', 'terminos'];
+    $routes = array_unique(array_merge($routes, array_keys(editorial_pages())));
     foreach ($routes as $route) {
-        echo '<url><loc>' . h(app_url($route)) . '</loc></url>';
+        $date = editorial_modified($route);
+        echo '<url><loc>' . h(app_url($route)) . '</loc>' . ($date ? '<lastmod>' . h($date) . '</lastmod>' : '') . '</url>';
     }
     foreach (public_dogs() as $dog) {
         echo '<url><loc>' . h(app_url('perro/' . $dog['slug'])) . '</loc><lastmod>' . h(substr((string) ($dog['updated_at'] ?? $dog['published_at']), 0, 10)) . '</lastmod></url>';
@@ -275,7 +279,7 @@ if ($path === '') {
         <div class="shell hero-grid">
             <div class="hero-copy">
                 <span class="eyebrow">Adopción responsable · Paraguay</span>
-                <h1>Un hogar cambia<br>toda una vida.</h1>
+                <h1>Perros en adopción<br>en Paraguay</h1>
                 <p class="hero-lead">Encontrá perros en adopción en Paraguay. Si conocés uno que necesita una familia, ayudalo a encontrarla con un aviso gratuito.</p>
                 <div class="button-row"><a class="button" href="/perros">Quiero adoptar</a><a class="button button-secondary" href="/dar-perro-en-adopcion">Publicar un aviso</a></div>
                 <div class="trust-line"><span>✓ Publicación gratuita</span><span>✓ Revisión antes de publicar</span><span>✓ Contacto responsable</span></div>
@@ -296,6 +300,7 @@ if ($path === '') {
     <section class="section section-blue"><div class="shell"><div class="section-head"><div><span class="eyebrow">Simple y cuidado</span><h2>Cómo funciona</h2></div></div><div class="steps"><article><span>1</span><h3>Enviás la ficha</h3><p>Contanos quién es el perro, dónde está y cómo pueden contactarte.</p></article><article><span>2</span><h3>La revisamos</h3><p>Una persona administradora verifica que esté completa y no sea una venta.</p></article><article><span>3</span><h3>Conectan con cuidado</h3><p>La persona interesada habla con el responsable y acuerdan un encuentro seguro.</p></article></div></div></section>
     <section class="section"><div class="shell split-callout"><div><span class="eyebrow">Antes de decir sí</span><h2>Adoptar es sumar una vida a la tuya</h2><p>Preguntá por salud, carácter, alimentación y rutina. Conocé al perro en un lugar seguro y nunca envíes dinero para “reservarlo”.</p><a class="text-link" href="/seguridad">Leé la guía de adopción segura <span aria-hidden="true">→</span></a></div><aside><strong>Una adopción responsable necesita:</strong><ul><li>Tiempo de adaptación</li><li>Atención veterinaria</li><li>Espacio y cuidados diarios</li><li>Compromiso para toda su vida</li></ul></aside></div></section>
     <?php
+    render_guide_links('Antes de adoptar o publicar');
     render_footer();
     exit;
 }
@@ -345,7 +350,7 @@ if ($path === 'dar-perro-en-adopcion') {
     if (!isset($old['listing_type']) && isset(listing_options()['listing_type'][$requestedType])) $old['listing_type'] = $requestedType;
     unset($_SESSION['old']);
     render_header(page_meta('Dar un perro en adopción en Paraguay | Perro', 'Enviá gratis una ficha para revisión y ayudá a encontrar un hogar responsable.', 'dar-perro-en-adopcion'));
-    ?><section class="page-hero compact"><div class="shell"><span class="eyebrow">Publicación gratuita y moderada</span><h1>Publicá un aviso. Ayudá a un perro.</h1><p>Sin cuenta y sin correo obligatorio. Completá el aviso y el equipo te contactará por WhatsApp para revisarlo. No aceptamos ventas ni cobros por entrega.</p><a class="text-link" href="/como-funciona">Cómo publicar, actualizar y compartir un aviso →</a></div></section>
+    ?><section class="page-hero compact"><div class="shell"><span class="eyebrow">Publicación gratuita y moderada</span><h1>Dar un perro en adopción o publicar un aviso</h1><p>Sin cuenta y sin correo obligatorio. Completá el aviso y el equipo te contactará por WhatsApp para revisarlo. No aceptamos ventas ni cobros por entrega.</p><a class="text-link" href="/como-funciona">Cómo publicar, actualizar y compartir un aviso →</a><p><a href="/reubicacion-responsable">Prepará una reubicación responsable</a> · <a href="/perros-perdidos-paraguay#encontre-un-perro">Pasos para un perro encontrado</a></p></div></section>
     <section class="section"><div class="shell form-layout"><aside class="form-aside"><h2>Tu aviso, paso a paso</h2><nav class="form-jump" aria-label="Secciones del formulario"><a href="#aviso">1. Aviso</a><a href="#perro">2. Datos del perro</a><a href="#fotos">3. Fotos</a><a href="#contacto">4. Contacto privado</a></nav><ul class="check-list"><li>Debés tener 18 años o más.</li><li>Necesitás autorización para publicar al perro.</li><li>Contá lo que sabés con honestidad.</li><li>La adopción debe ser gratuita.</li><li>Las fotos deben ser tuyas o tener permiso.</li></ul><div class="notice">Los datos de contacto permanecen privados salvo que autorices mostrar tu WhatsApp.</div></aside><form class="submission-form owner-form" data-retry="<?= $retry ? '1' : '0' ?>" method="post" action="/enviar-perro" enctype="multipart/form-data"><?= csrf_field() ?><input type="hidden" name="form_started" value="<?= time() ?>"><div class="honeypot" aria-hidden="true"><label>Sitio web<input name="website" tabindex="-1" autocomplete="off"></label></div>
     <fieldset id="aviso"><legend>1. Sobre la publicación</legend><div class="field-grid"><label>Tipo de aviso<select name="listing_type" required><?php select_options(listing_options()['listing_type'], $old['listing_type'] ?? 'adoption'); ?></select></label><label>Tu relación con el perro<select name="relationship" required><option value="">Seleccioná</option><?php select_options(array_combine(['Responsable actual', 'Hogar temporal', 'Rescatista independiente', 'Organización', 'Otra'], ['Responsable actual', 'Hogar temporal', 'Rescatista independiente', 'Organización', 'Otra']), $old['relationship'] ?? ''); ?></select></label></div></fieldset>
     <fieldset id="perro"><legend>2. Datos del perro</legend><div class="field-grid"><label>Nombre del perro (o «Sin nombre»)<input name="name" required maxlength="80" value="<?= h($old['name'] ?? '') ?>"></label><label>Departamento<input name="department" list="departamentos" required maxlength="80" placeholder="Ej. Central" value="<?= h($old['department'] ?? '') ?>"></label><label>Ciudad<input name="city" list="ciudades" required maxlength="100" placeholder="Ej. Luque" value="<?= h($old['city'] ?? '') ?>"></label><label>Edad aproximada<input name="approximate_age" maxlength="60" placeholder="Ej. 2 años" value="<?= h($old['approximate_age'] ?? '') ?>"></label><label>Etapa<select name="age_group" required><option value="">Seleccioná</option><?php select_options(listing_options()['age_group'], $old['age_group'] ?? ''); ?></select></label><label>Sexo<select name="sex" required><option value="">Seleccioná</option><?php select_options(listing_options()['sex'], $old['sex'] ?? ''); ?></select></label><label>Tamaño<select name="size" required><option value="">Seleccioná</option><?php select_options(listing_options()['size'], $old['size'] ?? ''); ?></select></label><label>Raza o apariencia<input name="breed_label" maxlength="100" placeholder="Ej. mestizo tipo labrador" value="<?= h($old['breed_label'] ?? '') ?>"></label></div><label class="check"><input type="checkbox" name="mixed_breed" value="1" <?= ($old['mixed_breed'] ?? '') === '1' ? 'checked' : '' ?>> Es mestizo o la raza es aproximada</label><label>Historia y personalidad<textarea name="description" required minlength="40" maxlength="3000" placeholder="Contá cómo es, qué rutina tiene y qué hogar podría acompañarlo mejor."><?= h($old['description'] ?? '') ?></textarea></label><div class="field-grid"><label>Vacunas<select name="vaccination_status"><?php select_options(listing_options()['vaccination_status'], $old['vaccination_status'] ?? 'No informado'); ?></select></label><label>Esterilización<select name="sterilization_status"><?php select_options(listing_options()['sterilization_status'], $old['sterilization_status'] ?? 'No informado'); ?></select></label></div><details class="optional-details"><summary>Salud, convivencia y requisitos (opcional)</summary><div class="submission-form"><label>Información de salud<textarea name="health_information" maxlength="1200"><?= h($old['health_information'] ?? '') ?></textarea></label><label>Compatibilidad conocida<textarea name="compatibility" maxlength="800" placeholder="Niños, perros, gatos, vida en departamento..."><?= h($old['compatibility'] ?? '') ?></textarea></label><label>Motivo y contexto<textarea name="reason" maxlength="1000"><?= h($old['reason'] ?? '') ?></textarea></label><label>Requisitos para adoptar<textarea name="adoption_requirements" maxlength="1200"><?= h($old['adoption_requirements'] ?? '') ?></textarea></label></div></details><div class="incident-fields"><p>Para avisos de perros perdidos o encontrados, indicá la zona y la fecha. Evitá publicar una dirección exacta.</p><div class="field-grid"><label>Zona aproximada (obligatoria si está perdido o fue encontrado)<input name="last_location" maxlength="180" value="<?= h($old['last_location'] ?? '') ?>"></label><label>Fecha del hecho (obligatoria si está perdido o fue encontrado)<input type="date" name="incident_date" value="<?= h($old['incident_date'] ?? '') ?>"></label></div></div></fieldset>
@@ -389,15 +394,15 @@ if ($path === 'gracias') {
             <a class="button button-secondary" href="<?= h(project_whatsapp_url($ownerMessage . 'Quisiera retirar el aviso o estos permisos: ')) ?>" target="_blank" rel="noopener noreferrer">Solicitar retiro</a>
             <a class="button button-secondary" href="<?= h(project_whatsapp_url($ownerMessage . 'Quisiera actualizar su estado: adoptado, reencontrado o todavía vigente. La situación actual es: ')) ?>" target="_blank" rel="noopener noreferrer">Avisar un cambio de estado</a>
         </div><?php endif; ?>
-        <p><a class="text-link" href="/como-funciona">Cómo funciona la revisión y cómo compartir después</a></p><a class="button" href="/perros">Ver avisos</a>
+        <p><a class="text-link" href="/como-funciona">Cómo funciona la revisión y cómo compartir después</a></p><p><a href="/reubicacion-responsable">Prepará una entrega responsable</a> · <a href="/hogar-temporal">Cómo organizar un hogar temporal</a></p><a class="button" href="/perros">Ver avisos</a>
     </div></section><?php
     render_footer(); exit;
 }
 
 if ($path === 'como-funciona') { render_how_it_works(); exit; }
+if (isset(editorial_pages()[$path])) { render_editorial($path); exit; }
 
 $contentPages = [
-    'seguridad' => ['Adopción segura', 'Consejos para conocer al perro y evitar engaños.', '<h2>Antes del encuentro</h2><ul><li>Pedí información sobre salud, rutina, carácter y motivo de adopción.</li><li>No envíes dinero para reservar un perro.</li><li>Desconfiá de urgencias artificiales o historias que no se pueden verificar.</li></ul><h2>Durante el encuentro</h2><ul><li>Elegí un lugar seguro y, si podés, andá acompañado.</li><li>Observá al perro con calma y respetá sus tiempos.</li><li>Si hay otros animales en casa, planificá una presentación gradual.</li></ul><h2>Después</h2><p>Coordiná una revisión veterinaria, prepará un espacio tranquilo y mantené una rutina estable durante la adaptación.</p>'],
     'centros-de-adopcion' => ['Centros de adopción y organizaciones', 'Directorio futuro de organizaciones verificadas en Paraguay.', '<div class="empty-state"><span class="empty-mark">+</span><h2>Todavía no publicamos organizaciones</h2><p>Estamos preparando el directorio. Si representás a una organización o grupo de rescate en Paraguay, contactá al equipo para solicitar una revisión de tus datos.</p></div>'],
 ];
 

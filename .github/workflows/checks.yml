@@ -32,5 +32,7 @@ jobs:
         run: PERRO_PHP_DISABLE_GD=1 node tools/privacy-smoke.cjs
       - name: Regression checks with images
         run: node tools/privacy-smoke.cjs
+      - name: SEO and visibility regression checks
+        run: node tools/seo-smoke.cjs
       - name: Audit regression checks
         run: node tools/audit-smoke.cjs

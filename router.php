@@ -8,6 +8,7 @@ $blocked = preg_match('#(?:^|/)[.]#', $path) === 1 || str_contains($path, '\\')
     || str_starts_with($path, '/storage/')
     || str_starts_with($path, '/includes/')
     || str_starts_with($path, '/tools/')
+    || $path === '/docs' || str_starts_with($path, '/docs/')
     || preg_match('/\.md$/i', $path) === 1
     || in_array($path, ['/config.php', '/.htaccess', '/README.md', '/CONFIGURACION.md'], true);
 if ($blocked) {

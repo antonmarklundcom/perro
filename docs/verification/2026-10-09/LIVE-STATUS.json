@@ -1,0 +1,66 @@
+{
+  "date": "2026-10-09",
+  "observations": [
+    {
+      "url": "https://perro.com.py/",
+      "status": 200,
+      "title": "Perros en adopción en Paraguay | Perro",
+      "h1": "Un hogar cambiatoda una vida.",
+      "release": "perro-2a75d794a509",
+      "robots": "index,follow",
+      "canonical": "https://perro.com.py/",
+      "sitemapRoutes": 0
+    },
+    {
+      "url": "https://perro.com.py/perros",
+      "status": 200,
+      "title": "Perros para adoptar en Paraguay | Perro",
+      "h1": "Perros para adoptar",
+      "release": "perro-2a75d794a509",
+      "robots": "index,follow",
+      "canonical": "https://perro.com.py/perros",
+      "sitemapRoutes": 0
+    },
+    {
+      "url": "https://perro.com.py/robots.txt",
+      "status": 200,
+      "title": null,
+      "h1": null,
+      "release": "perro-2a75d794a509",
+      "robots": null,
+      "canonical": null,
+      "sitemapRoutes": 0,
+      "robots_text": "User-agent: *\nAllow: /\nSitemap: https://perro.com.py/sitemap.xml\n"
+    },
+    {
+      "url": "https://perro.com.py/sitemap.xml",
+      "status": 200,
+      "title": null,
+      "h1": null,
+      "release": "perro-2a75d794a509",
+      "robots": null,
+      "canonical": null,
+      "sitemapRoutes": 10
+    },
+    {
+      "url": "https://mascota.com.py/",
+      "status": 200,
+      "title": "Default page",
+      "h1": "You Are All Set to Go!",
+      "release": null,
+      "robots": null,
+      "canonical": null,
+      "sitemapRoutes": 0
+    },
+    {
+      "url": "https://mascota.com.py/mascotas/perros/",
+      "status": 404,
+      "title": "This Page Does Not Exist",
+      "h1": "This Page Does Not Exist",
+      "release": null,
+      "robots": null,
+      "canonical": null,
+      "sitemapRoutes": 0
+    }
+  ]
+}

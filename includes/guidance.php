@@ -11,7 +11,7 @@ function render_how_it_works(): void
     ?>
     <section class="page-hero compact"><div class="shell">
         <span class="eyebrow">Perro · Paraguay</span>
-        <h1>Un aviso claro. Una adopción con cuidado.</h1>
+        <h1>Cómo publicar y actualizar un aviso en Perro</h1>
         <p>Enviás los datos, el equipo revisa y después podés compartir la ficha pública. Sin crear una cuenta y con tu contacto privado por defecto.</p>
         <div class="button-row"><a class="button button-coral" href="<?= h(app_url('dar-perro-en-adopcion')) ?>">Publicá un aviso</a><a class="button button-secondary" href="<?= h(app_url('perros')) ?>">Buscá un perro</a></div>
     </div></section>
@@ -61,5 +61,6 @@ function render_how_it_works(): void
         <div class="button-row"><a class="button button-coral" href="<?= h(app_url('dar-perro-en-adopcion')) ?>">Enviar una ficha</a><a class="button button-secondary" href="<?= h(app_url('perros')) ?>">Ver perros en adopción</a></div>
     </article></section>
     <?php
+    render_guide_links('Prepará una adopción responsable');
     render_footer();
 }

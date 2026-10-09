@@ -1,0 +1,1335 @@
+{
+  "source": "C:\\Users\\anton\\Downloads\\mascota.com.py-keywords-for-ai.md",
+  "sha256": "2000fc93e4fb1f9d9fbd2208f9e59b15e3bc776d8360df8bd4a4df82a704aade",
+  "read_order": [
+    "Summary",
+    "Meaning groups",
+    "Group details"
+  ],
+  "country": "Paraguay",
+  "language": "Spanish",
+  "CPC_currency": "SEK",
+  "selected_groups_in_source": 60,
+  "relevant_groups": [
+    {
+      "group": "perros",
+      "detail_rows": 50,
+      "detail_volume": 19630,
+      "section_sha256": "46331ccb8579b625b6a62cf8d5d5ba3a3dd580578043388684af641627d5f376",
+      "top_rows": [
+        {
+          "phrase": "perros",
+          "volume": 12100,
+          "low_cpc_SEK": "2.43",
+          "high_cpc_SEK": "3.18",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "perritos",
+          "volume": 2400,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "perro grandes",
+          "volume": 880,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "perros grandes"
+        },
+        {
+          "phrase": "perros pequeños",
+          "volume": 590,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "periquitos",
+          "volume": 480,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "El título y H1 ya contienen «perros». La mejora principal es cobertura e interconexión, no arreglar un término ausente."
+    },
+    {
+      "group": "veterinario cerca de mi",
+      "detail_rows": 38,
+      "detail_volume": 16800,
+      "section_sha256": "831275ae3b1a7af64aa064d7d1a189d1c699f74541563e2ff192318a1503afa7",
+      "top_rows": [
+        {
+          "phrase": "veterinario cerca de mi",
+          "volume": 14800,
+          "low_cpc_SEK": "0.60",
+          "high_cpc_SEK": "5.79",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "veterinario 24 horas cerca de mi",
+          "volume": 720,
+          "low_cpc_SEK": "1.09",
+          "high_cpc_SEK": "6.92",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "veterinario cerca de mi ubicación",
+          "volume": 260,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "clinica veterinaria cerca de mi",
+          "volume": 170,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "veterinario abierto ahora",
+          "volume": 140,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "Reservar para la fase de monetización y establecimientos reales contratados. No publicar ahora una página vacía ni afirmar cobertura, cercanía, atención 24 horas o geolocalización que no existen."
+    },
+    {
+      "group": "pastor australiano",
+      "detail_rows": 50,
+      "detail_volume": 16180,
+      "section_sha256": "5d8072695b71dfe03814d3114552ff8a80946a0a703594c60aabfd7a3fd8b5ac",
+      "top_rows": [
+        {
+          "phrase": "pastor australiano",
+          "volume": 5400,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "pastor siberiano",
+          "volume": 4400,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "pastor australiano ganadero",
+          "volume": 1900,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "pastor tibetano",
+          "volume": 1000,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "pastor ingles",
+          "volume": 590,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "Excluir pastor siberiano, tibetano, inglés y otras razas. El ganadero australiano no es una variante del pastor australiano."
+    },
+    {
+      "group": "labrador",
+      "detail_rows": 50,
+      "detail_volume": 10530,
+      "section_sha256": "88b5f38f771f3c132c752ba5b7433022ec8020b4c1a65f88483e74d1b18515b5",
+      "top_rows": [
+        {
+          "phrase": "labrador",
+          "volume": 4400,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "retriever labrador",
+          "volume": 1900,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "labrador perro",
+          "volume": 1600,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "perro labrador"
+        },
+        {
+          "phrase": "labrador negra",
+          "volume": 720,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "cachorros labrador",
+          "volume": 320,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "labrador cachorro, labrador cachorros"
+        }
+      ],
+      "limitations": ""
+    },
+    {
+      "group": "razas de perros",
+      "detail_rows": 50,
+      "detail_volume": 11530,
+      "section_sha256": "481715dee880cce2d5583f9f5bcf6fcc30c48c935130e837f8b34a6373f08410",
+      "top_rows": [
+        {
+          "phrase": "razas de perros",
+          "volume": 6600,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "raza de perro grande",
+          "volume": 1600,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "razas perros",
+          "volume": 590,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "perro raza pug",
+          "volume": 260,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "perros grandes razas"
+        },
+        {
+          "phrase": "perro raza american bully",
+          "volume": 210,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "perro raza shih tzu, raza de perro shih tzu, raza de perros shih tzu"
+        }
+      ],
+      "limitations": "«razas de perros pequeños» es una sección específica de este hub, con ancla estable #razas-pequenas; no crear un segundo catálogo casi idéntico."
+    },
+    {
+      "group": "cachorros husky",
+      "detail_rows": 50,
+      "detail_volume": 11890,
+      "section_sha256": "ef4e1a1088d707adb008b0fe2ace614de068abc5e4f667ad326f8e0b89b38d30",
+      "top_rows": [
+        {
+          "phrase": "cachorros husky",
+          "volume": 4400,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "bulldog cachorro",
+          "volume": 1900,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "golden terrier cachorro",
+          "volume": 1300,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "retriever cachorro"
+        },
+        {
+          "phrase": "cachorros",
+          "volume": 1000,
+          "low_cpc_SEK": "2.45",
+          "high_cpc_SEK": "13.65",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "cachorros doberman",
+          "volume": 880,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "doberman cachorro, doberman cachorros"
+        }
+      ],
+      "limitations": "Una página para husky siberiano, cachorros husky y la parte canina de raza siberiano. Usar secciones, sin páginas separadas de variantes; excluir gato siberiano."
+    },
+    {
+      "group": "den retriever",
+      "detail_rows": 50,
+      "detail_volume": 9360,
+      "section_sha256": "66e3a5b6728097fa115b607cfddadae1ea28db6fcb8f40085dc87b2647cb76c5",
+      "top_rows": [
+        {
+          "phrase": "den retriever",
+          "volume": 6600,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "gold3n retriever, golden r retriever, golden retriever, golden retriever retriever"
+        },
+        {
+          "phrase": "cachorro golden retriever",
+          "volume": 1300,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "bebes golden retriever",
+          "volume": 260,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "golden retriever bebes"
+        },
+        {
+          "phrase": "golden retriever precio",
+          "volume": 210,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "precio del golden retriever"
+        },
+        {
+          "phrase": "golden retriever labrador retriever",
+          "volume": 140,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "golden retriever y labrador, golden y labrador retriever, labrador golden retriever, labrador retriever y golden retriever, retriever labrador golden"
+        }
+      ],
+      "limitations": "Usar «golden retriever» de la misma fila, no escribir la errata «den retriever» para forzar coincidencia."
+    },
+    {
+      "group": "pastor alemán",
+      "detail_rows": 50,
+      "detail_volume": 9460,
+      "section_sha256": "c505da3476f6f95b71e1271fe6611d1c719ca04c8407faac7e9bb5500011df67",
+      "top_rows": [
+        {
+          "phrase": "pastor alemán",
+          "volume": 6600,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "pastor alemana"
+        },
+        {
+          "phrase": "bebe pastor aleman",
+          "volume": 720,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "bebes pastor aleman"
+        },
+        {
+          "phrase": "cachorros pastor aleman",
+          "volume": 590,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "perro pastor aleman"
+        },
+        {
+          "phrase": "pastor alemán precio",
+          "volume": 210,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "pastor aleman con pelo largo",
+          "volume": 170,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "Tres grupos del export se asignan a una sola página: pastor alemán, pastor alem y ovejero aleman. No sumar sus volúmenes como demanda independiente."
+    },
+    {
+      "group": "raza american bully",
+      "detail_rows": 50,
+      "detail_volume": 10160,
+      "section_sha256": "20753f12e44cfe5b27668be4e6fed21b162f8f8d0647b5113ca1777071a5b7df",
+      "top_rows": [
+        {
+          "phrase": "raza american bully",
+          "volume": 2900,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "raza fila"
+        },
+        {
+          "phrase": "gata de raza",
+          "volume": 2400,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "raza chao chao",
+          "volume": 1600,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "raza sharpei",
+          "volume": 480,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "raza beagle",
+          "volume": 390,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "Grupo muy contaminado: la fila de 2.900 mezcla american bully con fila y el resto incluye numerosas razas. Reexportar detalles limpios antes de escribir."
+    },
+    {
+      "group": "pitbull",
+      "detail_rows": 50,
+      "detail_volume": 9450,
+      "section_sha256": "782460e11de289e7f18f7b3e2e863350cc264022eedfe5ef35f6559f21fe41ef",
+      "top_rows": [
+        {
+          "phrase": "pitbull",
+          "volume": 5400,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "cachorros pitbull",
+          "volume": 1000,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "pitbull cachorros, pitbull perro"
+        },
+        {
+          "phrase": "pitbull terrier americano",
+          "volume": 880,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "pitbull blue",
+          "volume": 210,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "pitbull americano",
+          "volume": 170,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "pitbull raza, pitbull terrier cachorro"
+        }
+      ],
+      "limitations": "Distinguir el uso genérico de pitbull y las razas específicas; no promover peleas ni asumir normas locales sin fuentes."
+    },
+    {
+      "group": "veterinari",
+      "detail_rows": 50,
+      "detail_volume": 9790,
+      "section_sha256": "c72d71a808a26b85b36a74cf2f061d66b56074fbe7bc55aa6ff61a531ef4ecb3",
+      "top_rows": [
+        {
+          "phrase": "veterinari",
+          "volume": 8100,
+          "low_cpc_SEK": "0.90",
+          "high_cpc_SEK": "9.95",
+          "folded_variants": "veterinaria, veterinarie, veterinario"
+        },
+        {
+          "phrase": "ciencias veterinarias",
+          "volume": 320,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "veterinaria tacuary"
+        },
+        {
+          "phrase": "la veterinaria",
+          "volume": 260,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "veterinaria españa"
+        },
+        {
+          "phrase": "medica veterinaria",
+          "volume": 210,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "veterinaria integral",
+          "volume": 140,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "«veterinari» se conserva como clave del export, pero se escribe «veterinaria» en español. El contenido es una guía de elección; no prometer un buscador ni listados gratuitos."
+    },
+    {
+      "group": "bulldog frances",
+      "detail_rows": 50,
+      "detail_volume": 9180,
+      "section_sha256": "33a6e4dd02b5a941b2a1c6461361ff50a519f9f157f5cb76baff47182a629338",
+      "top_rows": [
+        {
+          "phrase": "bulldog frances",
+          "volume": 6600,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "perro bulldog frances",
+          "volume": 1300,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "bulldog frances precio",
+          "volume": 390,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "precio bulldog frances"
+        },
+        {
+          "phrase": "bulldog frances blue",
+          "volume": 70,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "bulldog frances cachorro",
+          "volume": 70,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": ""
+    },
+    {
+      "group": "pomerania",
+      "detail_rows": 50,
+      "detail_volume": 9030,
+      "section_sha256": "eb84f2632c25f7132916174b0d4affc537c59618823ff8f11828a64ccddaec4c",
+      "top_rows": [
+        {
+          "phrase": "pomerania",
+          "volume": 6600,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "pomeranio"
+        },
+        {
+          "phrase": "perritos pomerania",
+          "volume": 590,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "perros pomerania"
+        },
+        {
+          "phrase": "pomerania precio",
+          "volume": 480,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "cachorro pomerania",
+          "volume": 260,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "perro pomerania toy, pomerania cachorro, pomerania raza, pomerania toy, raza pomerania"
+        },
+        {
+          "phrase": "pomerania blanca",
+          "volume": 170,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "pomerania blanco"
+        }
+      ],
+      "limitations": "No presentar etiquetas de venta toy/mini como garantía de talla ni inventar precios locales."
+    },
+    {
+      "group": "perro vomito",
+      "detail_rows": 50,
+      "detail_volume": 780,
+      "section_sha256": "d65d30f32ab161f5cdd83840b7746e69166b217302af6334f0e727f06773c594",
+      "top_rows": [
+        {
+          "phrase": "perro vomito",
+          "volume": 70,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "vómitos en perros",
+          "volume": 70,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "perro que vomita sangre",
+          "volume": 40,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "porque mi perra vomita",
+          "volume": 30,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "porque vomita mi perro",
+          "volume": 30,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "Releer detalles y fuentes veterinarias antes de escribir. No convertir búsquedas de remedios o inducción del vómito en instrucciones. 8.370 es el grupo completo; los 50 registros exportados suman 780."
+    },
+    {
+      "group": "pastor alem",
+      "detail_rows": 50,
+      "detail_volume": 7660,
+      "section_sha256": "33a5f76f730812348107cb6c84e837a1fba47867f06d471fed8b4c99f12c9f46",
+      "top_rows": [
+        {
+          "phrase": "pastor alem",
+          "volume": 6600,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "pastor aleman belga",
+          "volume": 210,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "pastor aleman blanca"
+        },
+        {
+          "phrase": "pastor aleman recien nacido",
+          "volume": 70,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "pastor aleman puro",
+          "volume": 50,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "pastor aleman bebe blanco",
+          "volume": 40,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "Tres grupos del export se asignan a una sola página: pastor alemán, pastor alem y ovejero aleman. No sumar sus volúmenes como demanda independiente."
+    },
+    {
+      "group": "ovejero aleman",
+      "detail_rows": 45,
+      "detail_volume": 8070,
+      "section_sha256": "b9c777ba44e413612dcdf4d21fcc744a49198c21fc84ff85628d8314968d9ca4",
+      "top_rows": [
+        {
+          "phrase": "ovejero aleman",
+          "volume": 6600,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "perro ovejero",
+          "volume": 480,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "pastor ovejero",
+          "volume": 320,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "pastor aleman ovejero",
+          "volume": 70,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "perro ovejero raza",
+          "volume": 70,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "Tres grupos del export se asignan a una sola página: pastor alemán, pastor alem y ovejero aleman. No sumar sus volúmenes como demanda independiente."
+    },
+    {
+      "group": "doberman perro",
+      "detail_rows": 50,
+      "detail_volume": 6290,
+      "section_sha256": "e59266152918b27ebde18573ba7c8955a35637dd144c77e73db656f7d6b9538a",
+      "top_rows": [
+        {
+          "phrase": "doberman perro",
+          "volume": 880,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "perro raza doberman, perro raza weimaraner, perro rottweiler, perros doberman"
+        },
+        {
+          "phrase": "perro bulldog",
+          "volume": 720,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "perro teckel",
+          "volume": 590,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "perro lobo",
+          "volume": 480,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "perro en ingles",
+          "volume": 390,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "La fila principal mezcla dóberman, weimaraner y rottweiler. Conservar solamente variantes de dóberman; faltan detalles relevantes en este grupo."
+    },
+    {
+      "group": "razas de perros pequeños",
+      "detail_rows": 50,
+      "detail_volume": 6510,
+      "section_sha256": "f8c19dc24bace3cfb252f87894cb15a7e80cde068efdbba85c991a07a83b972e",
+      "top_rows": [
+        {
+          "phrase": "razas de perros pequeños",
+          "volume": 2400,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "razas de perros grandes",
+          "volume": 1600,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "perros pequeños razas",
+          "volume": 390,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "nombre de raza de perros pequeños",
+          "volume": 260,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "razas de perros chicos",
+          "volume": 170,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "«razas de perros pequeños» es una sección específica de este hub, con ancla estable #razas-pequenas; no crear un segundo catálogo casi idéntico."
+    },
+    {
+      "group": "perros salchichas",
+      "detail_rows": 50,
+      "detail_volume": 7530,
+      "section_sha256": "14f0365ddde22c152ef2965ea0b8609da16e60c4425e81fefb8680ad20058132",
+      "top_rows": [
+        {
+          "phrase": "perros salchichas",
+          "volume": 4400,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "perro pincher",
+          "volume": 1300,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "perros raza pincher, pincher enano, raza de perro pincher"
+        },
+        {
+          "phrase": "pecheras para perros",
+          "volume": 590,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "pequines"
+        },
+        {
+          "phrase": "peceras",
+          "volume": 320,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "peceras de vidrio",
+          "volume": 170,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "pinscher alemán"
+        }
+      ],
+      "limitations": "Excluir pinscher, pequinés, pecheras y peceras. La mayor parte del grupo no describe perros salchicha; recuperar ideas relacionadas limpias."
+    },
+    {
+      "group": "perros pug",
+      "detail_rows": 50,
+      "detail_volume": 5660,
+      "section_sha256": "db19e2a498438b14910b2b960074db050a1344d18ad04e2c721fb8aaa42e0820",
+      "top_rows": [
+        {
+          "phrase": "perros pug",
+          "volume": 1300,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "perro shih tzu",
+          "volume": 720,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "perro raza shar pei",
+          "volume": 480,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "pug perro, sharpei perro"
+        },
+        {
+          "phrase": "perros yorkie",
+          "volume": 390,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "lassie perro",
+          "volume": 320,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "perro shar pei, perros shar pei"
+        }
+      ],
+      "limitations": "Grupo mezclado con shar pei, shih tzu y marcas. No trasladar las variantes de esas razas a esta página."
+    },
+    {
+      "group": "cachorros chow",
+      "detail_rows": 50,
+      "detail_volume": 4330,
+      "section_sha256": "8234904965dc7b217955122ba91fbd6bae2fcb7b84d1613d5afb93a261efffe2",
+      "top_rows": [
+        {
+          "phrase": "cachorros chow",
+          "volume": 1600,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "cachorros chow chow, perro chow chow, perro raza chow chow"
+        },
+        {
+          "phrase": "dog chow dog chow",
+          "volume": 590,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "dogchow"
+        },
+        {
+          "phrase": "chow chow precio",
+          "volume": 390,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "chow chow blanco",
+          "volume": 320,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "dog chow cachorro",
+          "volume": 320,
+          "low_cpc_SEK": "2.52",
+          "high_cpc_SEK": "3.37",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "Separar estrictamente la raza chow chow de la marca de alimento Dog Chow; no planear la página de marca."
+    },
+    {
+      "group": "comida para perros",
+      "detail_rows": 50,
+      "detail_volume": 1780,
+      "section_sha256": "12f3f63908331cc95d21898201e0f061481a404927b7aeb3ef2a8801f05d3f8f",
+      "top_rows": [
+        {
+          "phrase": "comida para perros",
+          "volume": 480,
+          "low_cpc_SEK": "2.69",
+          "high_cpc_SEK": "3.70",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "racion para perros",
+          "volume": 140,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "alimento para perros",
+          "volume": 110,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "comida de perro"
+        },
+        {
+          "phrase": "comida para perros paraguay",
+          "volume": 110,
+          "low_cpc_SEK": "2.50",
+          "high_cpc_SEK": "3.14",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "comederos para perros",
+          "volume": 90,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "No crear comparativas ni páginas de marca. La tabla de datos expresa CPC en SEK: no son precios del producto ni dificultad SEO."
+    },
+    {
+      "group": "argentino dogo",
+      "detail_rows": 50,
+      "detail_volume": 6530,
+      "section_sha256": "57dcde34652193e5f9b5572afe1e1241aa0c47efd046720eca5e7aa168661aa4",
+      "top_rows": [
+        {
+          "phrase": "argentino dogo",
+          "volume": 4400,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "dogo aleman, dogo argentino"
+        },
+        {
+          "phrase": "dogo de burdeo",
+          "volume": 480,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "dogo",
+          "volume": 390,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "dogos"
+        },
+        {
+          "phrase": "dogo argentino perro",
+          "volume": 170,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "dogo argentino precio",
+          "volume": 140,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "La fila de 4.400 mezcla dogo argentino con dogo alemán: son razas diferentes. Excluir dogo alemán y no sumar una segunda vez la variante dogo argentino."
+    },
+    {
+      "group": "raza siberiano",
+      "detail_rows": 29,
+      "detail_volume": 6530,
+      "section_sha256": "3c63c68b90f464ded6df0d76a7ee487ad3e077d656546fa8169c4e5f4c78caad",
+      "top_rows": [
+        {
+          "phrase": "raza siberiano",
+          "volume": 4400,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "perro siberiano",
+          "volume": 720,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "lobo siberiano",
+          "volume": 480,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "siberiano"
+        },
+        {
+          "phrase": "gato siberiano",
+          "volume": 390,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "perro lobo siberiano",
+          "volume": 170,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "Una página para husky siberiano, cachorros husky y la parte canina de raza siberiano. Usar secciones, sin páginas separadas de variantes; excluir gato siberiano."
+    },
+    {
+      "group": "alergia en perros",
+      "detail_rows": 50,
+      "detail_volume": 1040,
+      "section_sha256": "9e0338fc10d212543ab3796df2e5c5ed9c8db437ba0e112cdb7db787e449c2f0",
+      "top_rows": [
+        {
+          "phrase": "alergia en perros",
+          "volume": 110,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "alergia a gatos",
+          "volume": 50,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "alergia a los gatos",
+          "volume": 50,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "alergia al gato",
+          "volume": 50,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "alergia de gato en la piel",
+          "volume": 50,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "Excluir alergia de personas a gatos. No prescribir medicamentos o dosis. Releer fuentes veterinarias antes de desarrollar respuestas."
+    },
+    {
+      "group": "caniche",
+      "detail_rows": 50,
+      "detail_volume": 4810,
+      "section_sha256": "e9ddb8579fb076486e8eb6de7d09f55bf93a0047f8ebee8fb804af4afcd9eed5",
+      "top_rows": [
+        {
+          "phrase": "caniche",
+          "volume": 3600,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "caniche bebe",
+          "volume": 140,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "caniche enano"
+        },
+        {
+          "phrase": "caniche grande",
+          "volume": 110,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "caniche 1",
+          "volume": 90,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "caniche 2",
+          "volume": 70,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "El grupo adicional caniche toy (5.350, fuera de los 40) podrá incorporarse a la sección de tamaños después de revisar sus detalles; sin página duplicada."
+    },
+    {
+      "group": "chihuahua",
+      "detail_rows": 50,
+      "detail_volume": 5540,
+      "section_sha256": "5d315a48348877fe93d10e7c1fb1bf0c3a760c55bb6c772cd0ec6432c6881d94",
+      "top_rows": [
+        {
+          "phrase": "chihuahua",
+          "volume": 2900,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "perro chihuahua",
+          "volume": 1600,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "chihuahua bebe",
+          "volume": 110,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "chihuahua mexicano, cimarrón uruguayo"
+        },
+        {
+          "phrase": "chihuahua precio",
+          "volume": 90,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "cachorros chihuahua",
+          "volume": 70,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "Excluir cimarrón uruguayo aunque la herramienta lo presente en la misma fila que chihuahua bebe."
+    },
+    {
+      "group": "pipetas para perros",
+      "detail_rows": 50,
+      "detail_volume": 3890,
+      "section_sha256": "3108662109146b568886811f8aaa8d652cb43764b71f8575c0afa04730f70b8e",
+      "top_rows": [
+        {
+          "phrase": "pipetas para perros",
+          "volume": 590,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "ropa para perros",
+          "volume": 390,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "ropita para perros"
+        },
+        {
+          "phrase": "shampoo para perro",
+          "volume": 320,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "shampoo para perros"
+        },
+        {
+          "phrase": "pañales para perros",
+          "volume": 260,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "pate para perros",
+          "volume": 210,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "Solo dos frases relevantes en este grupo. Excluir ropa, champú, vitaminas y otras medicinas; reexportar antiparasitarios por especie. No páginas de marcas ni recomendaciones de dosis."
+    },
+    {
+      "group": "husky siberiano",
+      "detail_rows": 50,
+      "detail_volume": 5400,
+      "section_sha256": "08a153090578537596bc926acd53c41105de6de13304aa5968f2109c01a8d242",
+      "top_rows": [
+        {
+          "phrase": "husky siberiano",
+          "volume": 4400,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "husky siberiano raza, husky siberianos, perro husky, perro husky siberiano, perro raza husky, siberiano husky"
+        },
+        {
+          "phrase": "husky blanco",
+          "volume": 170,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "husky siberiano precio"
+        },
+        {
+          "phrase": "husky bebes",
+          "volume": 140,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": "husky siberiano blanco"
+        },
+        {
+          "phrase": "raza de perro husky",
+          "volume": 90,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "raza de perro husky siberiano",
+          "volume": 70,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "Una página para husky siberiano, cachorros husky y la parte canina de raza siberiano. Usar secciones, sin páginas separadas de variantes; excluir gato siberiano."
+    },
+    {
+      "group": "tos en perros",
+      "detail_rows": 50,
+      "detail_volume": 1010,
+      "section_sha256": "00079640091d9d21c2fed0e5dba0ecad75a3e902ae92ba7bebf9b8f32b8c8396",
+      "top_rows": [
+        {
+          "phrase": "tos en perros",
+          "volume": 110,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "tos de las perreras",
+          "volume": 90,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "tos de perro",
+          "volume": 90,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "mi perro tiene tos como si tuviera algo atorado",
+          "volume": 70,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        },
+        {
+          "phrase": "tos de la perrera tratamiento",
+          "volume": 50,
+          "low_cpc_SEK": "0.00",
+          "high_cpc_SEK": "0.00",
+          "folded_variants": ""
+        }
+      ],
+      "limitations": "Extra prioritario fuera de los 40. Tratar tos de las perreras como sección, no como sinónimo de cualquier tos. No prometer remedios caseros; fuentes veterinarias antes de redactar."
+    }
+  ]
+}

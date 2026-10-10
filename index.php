@@ -15,6 +15,8 @@ require __DIR__ . '/includes/editorial.php';
 require __DIR__ . '/includes/workflows.php';
 require __DIR__ . '/includes/admin-panel.php';
 require __DIR__ . '/includes/operations.php';
+require __DIR__ . '/includes/owner-updates.php';
+require __DIR__ . '/includes/retention.php';
 
 $path = request_path();
 if (method_is_post() || in_array($path, ['admin', 'activar-admin', 'dar-perro-en-adopcion', 'gracias'], true) || str_starts_with($path, 'admin/')) start_perro_session();
@@ -22,6 +24,8 @@ if (method_is_post() && ini_bytes((string) ini_get('post_max_size')) > 0
     && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > ini_bytes((string) ini_get('post_max_size'))) {
     render_error_page('El envío es demasiado grande', 'Reducí las fotos o enviá menos archivos. El servidor rechazó el tamaño total del envío.', 413); exit;
 }
+owner_update_routes($path);
+retention_routes($path);
 admin_edit_routes($path);
 admin_account_routes($path);
 sharing_routes($path);
@@ -256,7 +260,7 @@ if ($path === 'admin/action' && method_is_post()) {
 }
 
 if ($path === 'admin/export.csv') {
-    require_admin();
+    require_admin_capability('export_private');
     header('Cache-Control: no-store');
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="perro-listados-' . date('Y-m-d') . '.csv"');
@@ -334,7 +338,7 @@ if (preg_match('#^perro/([a-z0-9-]+)$#', $path, $matches)) {
     render_header($meta);
     ?><section class="section dog-detail"><nav class="shell breadcrumbs" aria-label="Ruta de navegación"><a href="/">Inicio</a><span>›</span><a href="<?= ($dog['listing_type'] ?? 'adoption') === 'adoption' ? '/perros' : '/perros-perdidos-paraguay' ?>"><?= ($dog['listing_type'] ?? 'adoption') === 'adoption' ? 'Adopción' : 'Perdidos y encontrados' ?></a><span>›</span><span><?= h($dog['name']) ?></span></nav><div class="shell dog-detail-grid"><div class="dog-gallery"><?php if (!empty($dog['photos'])): foreach ($dog['photos'] as $index => $photo): ?><img src="/media/<?= h($dog['id']) ?>/<?= h($photo) ?>" alt="<?= h($dog['name']) ?><?= $index ? ', otra vista' : '' ?>"<?= $index ? ' loading="lazy"' : '' ?>><?php endforeach; else: ?><div class="photo-placeholder large">Foto no disponible</div><?php endif; ?></div><article class="dog-profile"><span class="eyebrow"><?= h($dog['city']) ?> · <?= h($dog['department']) ?></span><h1><?= h($dog['name']) ?></h1><?php if (($dog['public_name'] ?? false) === true && !empty($dog['contact_name'])): ?><p class="date-note">Nombre público del responsable: <?= h($dog['contact_name']) ?></p><?php endif; ?><p class="status-pill"><?= h($typeLabel) ?><?= ($dog['adoption_status'] ?? '') === 'reserved' ? ' · Reservado' : '' ?></p><?php if (($dog['listing_type'] ?? 'adoption') !== 'adoption'): ?><p><strong>Zona aproximada:</strong> <?= h($dog['last_location'] ?? '') ?><br><strong>Fecha:</strong> <?= h(format_date($dog['incident_date'] ?? '')) ?></p><div class="notice">Este aviso busca reunir al perro con su responsable. No es una oferta de adopción. Verificá la relación con el perro y avisá a las autoridades competentes.</div><?php endif; ?><p class="profile-lead"><?= h($dog['description']) ?></p><dl class="facts"><div><dt>Edad</dt><dd><?= h($dog['approximate_age'] ?: $dog['age_group']) ?></dd></div><div><dt>Sexo</dt><dd><?= h($dog['sex']) ?></dd></div><div><dt>Tamaño</dt><dd><?= h($dog['size']) ?></dd></div><div><dt>Raza</dt><dd><?= h($dog['breed_label'] ?: (!empty($dog['mixed_breed']) ? 'Mestizo o raza aproximada' : 'Raza no informada')) ?></dd></div><?php if ($dog['listing_type'] === 'adoption'): ?><div><dt>Vacunas</dt><dd><?= h($dog['vaccination_status'] ?: 'No informado') ?></dd></div><div><dt>Esterilización</dt><dd><?= h($dog['sterilization_status'] ?: 'No informado') ?></dd></div><?php endif; ?></dl>
     <?php if ($dog['compatibility']): ?><h2>Compatibilidad conocida</h2><p><?= nl2br(h($dog['compatibility'])) ?></p><?php endif; ?><?php if ($dog['health_information']): ?><h2>Información de salud</h2><p><?= nl2br(h($dog['health_information'])) ?></p><small>Información declarada por la persona responsable; verificá con un profesional veterinario.</small><?php endif; ?><?php if ($dog['adoption_requirements']): ?><h2>Lo que busca su responsable</h2><p><?= nl2br(h($dog['adoption_requirements'])) ?></p><?php endif; ?>
-    <div class="profile-actions"><a class="button button-whatsapp" href="/contactar/<?= h($dog['slug']) ?>" rel="noopener noreferrer"><?= $dog['contact_whatsapp'] !== '' ? 'Consultar por WhatsApp' : 'Consultar al equipo de Perro' ?></a><?php if ($dog['contact_whatsapp'] === ''): ?><p>El contacto del responsable permanece privado. <a class="text-link" href="<?= h(project_whatsapp_url(enquiry_message($dog))) ?>">WhatsApp del equipo</a></p><?php endif; ?></div>
+    <?php retention_save_button($dog); ?><div class="profile-actions"><a class="button button-whatsapp" href="/contactar/<?= h($dog['slug']) ?>" rel="noopener noreferrer"><?= $dog['contact_whatsapp'] !== '' ? 'Consultar por WhatsApp' : 'Consultar al equipo de Perro' ?></a><?php if ($dog['contact_whatsapp'] === ''): ?><p>El contacto del responsable permanece privado. <a class="text-link" href="<?= h(project_whatsapp_url(enquiry_message($dog))) ?>">WhatsApp del equipo</a></p><?php endif; ?></div>
     <?php if ($dog['listing_type'] === 'adoption'): ?><p class="notice">La adopción es gratuita: no pagues para reservar. Conocé al perro en un lugar seguro. <a href="/seguridad">Guía de adopción segura →</a></p><?php endif; ?>
     <?php if ($dog['adoption_status'] === 'reserved'): ?><p>Reservado: alguien está en conversación; podés consultar igual.</p><?php endif; ?>
     <aside class="mobile-contact"><a class="button button-whatsapp" href="/contactar/<?= h($dog['slug']) ?>">Consultar por WhatsApp</a></aside><p><a class="text-link" href="#compartir">Compartí este aviso →</a></p><p class="date-note">Publicada el <?= h(format_date($dog['published_at'])) ?> · Última confirmación <?= h(format_date($dog['last_confirmed_at'])) ?></p></article></div></section>

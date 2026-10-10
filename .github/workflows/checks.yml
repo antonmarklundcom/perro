@@ -36,3 +36,9 @@ jobs:
         run: node tools/seo-smoke.cjs
       - name: Audit regression checks
         run: node tools/audit-smoke.cjs
+      - name: Storage reliability and isolated recovery checks
+        run: node tools/storage-smoke.cjs
+      - name: Team access and owner-link checks
+        run: node tools/access-owner-smoke.cjs
+      - name: Saved references and feed privacy checks
+        run: node tools/retention-smoke.cjs

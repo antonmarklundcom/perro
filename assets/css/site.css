@@ -427,6 +427,13 @@ details[open] > summary { margin-bottom: 12px; }
 
 /* Adoption guides: readable article navigation and keyboard-accessible FAQs. */
 .editorial-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1.5rem; margin:1.5rem 0; }
+.saved-toggle { margin:.7rem 1rem 1rem; }
+.saved-toggle[aria-pressed="true"] { background:#e3efe7; color:#173f2d; }
+.saved-feedback { margin:.5rem 1rem; font-size:.9rem; }
+.saved-list { list-style:none; padding:0; }
+.saved-list li { border-bottom:1px solid #dce6df; padding:1rem 0; display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+.saved-list p { margin:0; overflow-wrap:anywhere; }
+@media(max-width:600px) { .saved-list li { align-items:flex-start; flex-direction:column; } }
 .editorial-grid article { background:var(--paper,#fff); padding:1.4rem; border:1px solid #dce6df; border-radius:16px; }
 .editorial-grid h3 { margin:0 0 .6rem; font-size:1.15rem; }
 .editorial-grid p { margin:0; }

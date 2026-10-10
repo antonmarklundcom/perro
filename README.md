@@ -105,3 +105,7 @@ Siete páginas nuevas orientan requisitos, elección, hogar temporal, reubicaci�
 Para staging configurá `PERRO_NOINDEX=1` en el proceso PHP: robots, meta y cabecera bloquean indexación. Confirmá que esté desactivado en producción. `PERRO_MASCOTA_GUIDES_ENABLED=1` activa enlaces contextuales solo después de publicar/verificar las cinco guías de Mascota; por defecto están deshabilitados porque el dominio mostró una página de hosting por defecto.
 
 `node tools/seo-smoke.cjs` agrega pruebas aisladas de SEO y estados. `python tools/build-release.py DESTINO.zip` prepara desde una revisión limpia y comprometida solo archivos de aplicación para Hostinger, sin storage privado, investigación o configuración secreta. La adopción sigue gratuita y la página `/apoyar` no habilita cobros.
+
+## Reliability and return visits — 9 October 2026
+
+See [the new operating instructions](docs/development/2026-10-09/IMPLEMENTATION.md) and [status-first Claude audit prompt](docs/development/2026-10-09/CLAUDE-STATUS-FIRST.txt). Storage remains private JSON; this release adds safeguards, diagnostics, verified backup drills, cleanup retries, worker claims, scoped owner links, team roles, saved references and RSS. No SQL migration is needed.

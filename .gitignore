@@ -8,3 +8,6 @@ storage/uploads/*
 storage/cache/*
 !storage/uploads/.gitkeep
 *.log
+
+/storage/installation.json
+/storage/installation.json.tmp-*

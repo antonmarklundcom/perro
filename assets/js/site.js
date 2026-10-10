@@ -1,5 +1,117 @@
 (function () {
   'use strict';
+  const buttons = Array.from(document.querySelectorAll('[data-save-dog]'));
+  const panel = document.querySelector('[data-saved-dogs]');
+  if (!buttons.length && !panel) return;
+  const key = 'perro-saved-dogs:v1';
+  const valid = function (slug) { return typeof slug === 'string' && /^[a-z0-9-]{1,512}$/.test(slug); };
+  let saved = [], storageOK = true, generation = 0;
+  const message = panel ? panel.querySelector('[data-saved-status]') : document.createElement('p');
+  if (!panel) { message.className = 'saved-feedback'; message.setAttribute('role', 'status'); buttons[0].after(message); }
+  const read = function () {
+    try {
+      const value = localStorage.getItem(key);
+      const parsed = value && value.length <= 53000 ? JSON.parse(value) : [];
+      saved = Array.isArray(parsed) ? Array.from(new Set(parsed.filter(valid))).slice(0, 100) : [];
+      storageOK = true;
+    } catch (_) { saved = []; storageOK = false; }
+  };
+  const sync = function () {
+    buttons.forEach(function (button) {
+      button.hidden = false;
+      button.setAttribute('aria-pressed', String(saved.includes(button.dataset.saveDog)));
+      button.textContent = saved.includes(button.dataset.saveDog) ? 'Quitar de guardados' : 'Guardar aviso';
+    });
+    if (panel) panel.querySelector('[data-saved-clear]').hidden = !saved.length;
+  };
+  const persist = function (next) {
+    try { localStorage.setItem(key, JSON.stringify(next)); saved = next; storageOK = true; return true; }
+    catch (_) { storageOK = false; message.textContent = 'Este navegador no permite guardar la lista. Revisá sus permisos de almacenamiento.'; return false; }
+  };
+  const refresh = async function () {
+    const current = ++generation;
+    sync();
+    if (panel) {
+      const list = panel.querySelector('[data-saved-list]'); list.replaceChildren();
+      saved.forEach(function (slug) {
+        const row = document.createElement('li'), label = document.createElement('p'), remove = document.createElement('button');
+        label.textContent = 'Estado sin confirmar (' + slug + ').';
+        remove.type = 'button'; remove.className = 'button button-secondary'; remove.textContent = 'Quitar';
+        remove.setAttribute('aria-label', 'Quitar aviso ' + slug + ' de guardados');
+        remove.addEventListener('click', function () { if (persist(saved.filter(function (value) { return value !== slug; }))) refresh(); });
+        row.append(label, remove); list.append(row);
+      });
+    }
+    if (!storageOK) { message.textContent = 'No pudimos leer los guardados de este navegador. Revisá sus permisos de almacenamiento.'; return; }
+    if (!saved.length) { if (panel) message.textContent = 'Todavía no guardaste avisos en este navegador.'; return; }
+    if (panel) message.textContent = 'Consultando el estado actual…';
+    try {
+      const requested = saved.slice(), items = [];
+      // Keep even maximum-length saved slugs below web-server request-line limits.
+      for (let start = 0; start < requested.length;) {
+        if (current !== generation) return;
+        const batch = [];
+        while (start < requested.length && batch.length < 20) {
+          const candidate = batch.concat(requested[start]);
+          if (batch.length && ('/guardados/estado?slugs=' + encodeURIComponent(candidate.join(','))).length > 2400) break;
+          batch.push(requested[start++]);
+        }
+        const response = await fetch('/guardados/estado?slugs=' + encodeURIComponent(batch.join(',')), {cache:'no-store', credentials:'omit'});
+        if (!response.ok) throw Error('status');
+        const payload = await response.json();
+        if (current !== generation) return;
+        if (!Array.isArray(payload.items) || payload.items.length !== batch.length || batch.some(function (slug) { return !payload.items.some(function (entry) { return entry && entry.slug === slug; }); })) throw Error('items');
+        items.push(...payload.items);
+      }
+      if (!panel) return;
+      const list = panel.querySelector('[data-saved-list]');
+      list.replaceChildren();
+      const types = {adoption:'Adopción', lost:'Perdido', found:'Encontrado'};
+      requested.forEach(function (slug) {
+        const item = items.find(function (entry) { return entry.slug === slug; });
+        if (!item) throw Error('item');
+        const row = document.createElement('li');
+        const description = document.createElement('p');
+        if (item.available === true) {
+          const link = document.createElement('a'); link.href = '/perro/' + slug; link.textContent = item.name; description.append(link);
+          description.append(document.createTextNode(' · ' + (types[item.type] || 'Aviso') + ' · ' + item.city + (item.status === 'reserved' ? ' · Reservado' : '')));
+        } else description.textContent = 'Este aviso ya no está disponible públicamente (' + slug + ').';
+        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button button-secondary'; remove.textContent = 'Quitar';
+        remove.setAttribute('aria-label', 'Quitar aviso ' + slug + ' de guardados');
+        remove.addEventListener('click', function () { if (persist(saved.filter(function (value) { return value !== slug; }))) refresh(); });
+        row.append(description, remove); list.append(row);
+      });
+      message.textContent = saved.length + ' aviso(s) guardado(s). Estado consultado ahora; confirmalo antes de contactar.';
+    } catch (_) {
+      if (current !== generation) return;
+      message.textContent = 'No pudimos confirmar los estados actuales. Tus referencias siguen guardadas; volvé a intentar más tarde.';
+    }
+  };
+  read(); sync();
+  buttons.forEach(function (button) {
+    button.addEventListener('click', function () {
+      const slug = button.dataset.saveDog;
+      if (!valid(slug)) return;
+      const exists = saved.includes(slug);
+      if (!exists && saved.length >= 100) { message.textContent = 'Podés guardar hasta 100 avisos. Quitá alguno para agregar otro.'; return; }
+      if (persist(exists ? saved.filter(function (value) { return value !== slug; }) : saved.concat(slug))) {
+        message.textContent = exists ? 'Aviso quitado de guardados.' : 'Aviso guardado solo en este navegador. No reserva un perro.';
+        refresh();
+      }
+    });
+  });
+  if (panel) panel.querySelector('[data-saved-clear]').addEventListener('click', function () {
+    try { localStorage.removeItem(key); saved = []; storageOK = true; refresh(); }
+    catch (_) { message.textContent = 'No pudimos vaciar la lista. Revisá los permisos de almacenamiento del navegador.'; }
+  });
+  window.addEventListener('storage', function (event) { if (event.key === key || event.key === null) { read(); refresh(); } });
+  window.addEventListener('pageshow', function () { read(); refresh(); });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { read(); refresh(); } });
+  refresh();
+})();
+
+(function () {
+  'use strict';
   const toggle = document.querySelector('.nav-toggle');
   const nav = document.querySelector('#site-nav');
   if (toggle && nav) {

@@ -2,6 +2,22 @@
 
 declare(strict_types=1);
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
+$options = getopt('', ['archive', 'retention', 'apply', 'days:', 'backup-dir:', 'verify-backup:', 'restore-dir:', 'notifications', 'digest', 'backfill', 'scrub-notes', 'audit-phones', 'doctor', 'cleanup']);
+if (isset($options['doctor'])) {
+    if (count($options) !== 1) throw new InvalidArgumentException('Doctor no se combina con operaciones de escritura.');
+    require dirname(__DIR__) . '/includes/storage.php';
+    $report = storage_doctor(dirname(__DIR__));
+    echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
+    exit($report['ok'] ? 0 : 2);
+}
+if (isset($options['verify-backup'])) {
+    if (!isset($options['restore-dir']) || count($options) !== 2) throw new InvalidArgumentException('Usá verify-backup con restore-dir, sin otras operaciones.');
+    require dirname(__DIR__) . '/includes/storage.php';
+    require dirname(__DIR__) . '/includes/backups.php';
+    $report = verify_storage_backup((string) $options['verify-backup'], (string) $options['restore-dir'], dirname(__DIR__));
+    echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
+    exit($report['ok'] ? 0 : 2);
+}
 require dirname(__DIR__) . '/includes/bootstrap.php';
 require PERRO_ROOT . '/includes/data.php';
 require PERRO_ROOT . '/includes/render.php';
@@ -9,8 +25,10 @@ require PERRO_ROOT . '/includes/moderation.php';
 require PERRO_ROOT . '/includes/sharing.php';
 require PERRO_ROOT . '/includes/workflows.php';
 require PERRO_ROOT . '/includes/operations.php';
+require_once PERRO_ROOT . '/includes/reliability.php';
+require PERRO_ROOT . '/includes/backups.php';
 
-$options = getopt('', ['archive', 'retention', 'apply', 'days:', 'backup-dir:', 'notifications', 'digest', 'backfill', 'scrub-notes', 'audit-phones']);
+
 $days = max(180, (int) ($options['days'] ?? 180));
 if (isset($options['audit-phones'])) {
     $issues = with_data_read_lock(static function (): array {
@@ -88,30 +106,7 @@ if (isset($options['backfill'])) {
     }
     echo "Image variants prepared.\n";
 }
-if (isset($options['backup-dir'])) {
-    if (!class_exists(ZipArchive::class)) throw new RuntimeException('La copia requiere la extensión ZIP.');
-    $directory = (string) $options['backup-dir'];
-    if (!is_dir($directory) && !mkdir($directory, 0700, true)) throw new RuntimeException('No se pudo crear el destino.');
-    $directory = realpath($directory); $root = realpath(PERRO_ROOT);
-    if ($directory === false || $root === false || str_starts_with(strtolower($directory . DIRECTORY_SEPARATOR), strtolower($root . DIRECTORY_SEPARATOR))) throw new RuntimeException('El respaldo debe quedar fuera de la raíz pública de Perro.');
-    $backup = $directory . '/perro-backup-' . date('Ymd-His') . '-' . bin2hex(random_bytes(3)) . '.zip';
-    with_data_lock(static function () use ($backup): void {
-        $zip = new ZipArchive();
-        if ($zip->open($backup, ZipArchive::CREATE | ZipArchive::EXCL) !== true) throw new RuntimeException('No se pudo abrir la copia.');
-        try {
-            $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(PERRO_STORAGE, FilesystemIterator::SKIP_DOTS));
-            foreach ($iterator as $file) {
-                if (!$file->isFile() || $file->isLink()) continue;
-                $relative = str_replace('\\', '/', substr($file->getPathname(), strlen(PERRO_STORAGE) + 1));
-                if (str_starts_with($relative, 'cache/') || str_ends_with($relative, '.lock') || str_contains($relative, '.tmp-')) continue;
-                if (!$zip->addFile($file->getPathname(), 'storage/' . $relative)) throw new RuntimeException('No se pudo copiar un archivo.');
-            }
-        } finally { if (!$zip->close()) throw new RuntimeException('No se pudo completar la copia.'); }
-    });
-    $backups = glob($directory . '/perro-backup-*.zip') ?: []; rsort($backups);
-    foreach (array_slice($backups, 14) as $old) if (!@unlink($old)) throw new RuntimeException('No se pudo rotar una copia antigua.');
-    echo $backup . "\n";
-}
+if (isset($options['backup-dir'])) echo create_storage_backup((string) $options['backup-dir']) . "\n";
 if (isset($options['notifications']) || isset($options['digest'])) {
     $recipient = filter_var(getenv('PERRO_NOTIFY_EMAIL') ?: '', FILTER_VALIDATE_EMAIL);
     $sender = filter_var(getenv('PERRO_NOTIFY_FROM') ?: '', FILTER_VALIDATE_EMAIL);
@@ -139,4 +134,5 @@ if (isset($options['scrub-notes'])) {
     });
     echo $count . (isset($options['apply']) ? ' historical notes scrubbed' : ' historical notes would be scrubbed') . "\n";
 }
-if (!$options) echo "Use --archive [--apply] [--days=180], --retention [--apply], --backup-dir=PATH, --backfill, --audit-phones, --scrub-notes [--apply], --notifications or --digest.\n";
+if (isset($options['cleanup'])) echo json_encode(run_cleanup_jobs(), JSON_UNESCAPED_UNICODE) . "\n";
+if (!$options) echo "Use --doctor, --cleanup, --verify-backup=ZIP --restore-dir=EMPTY-PATH, --archive [--apply] [--days=180], --retention [--apply], --backup-dir=PATH, --backfill, --audit-phones, --scrub-notes [--apply], --notifications or --digest.\n";

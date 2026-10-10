@@ -45,7 +45,7 @@ function perro_release_id(): string
     static $id;
     if ($id === null) {
         $hashes = [];
-        foreach (['index.php', 'router.php', 'includes/bootstrap.php', 'includes/data.php', 'includes/legal.php', 'includes/moderation.php', 'includes/accounts.php', 'includes/experience.php', 'includes/sharing.php', 'includes/guidance.php', 'includes/editorial.php', 'includes/render.php', 'includes/workflows.php', 'includes/admin-panel.php', 'includes/operations.php', 'assets/css/site.css', 'assets/js/site.js'] as $file) {
+        foreach (['index.php', 'router.php', 'includes/bootstrap.php', 'includes/data.php', 'includes/storage.php', 'includes/access.php', 'includes/owner-updates.php', 'includes/retention.php', 'includes/reliability.php', 'includes/backups.php', 'includes/legal.php', 'includes/moderation.php', 'includes/accounts.php', 'includes/experience.php', 'includes/sharing.php', 'includes/guidance.php', 'includes/editorial.php', 'includes/render.php', 'includes/workflows.php', 'includes/admin-panel.php', 'includes/operations.php', 'assets/css/site.css', 'assets/js/site.js'] as $file) {
             $hashes[] = hash('sha256', str_replace("\r\n", "\n", file_get_contents(PERRO_ROOT . '/' . $file)));
         }
         $hashes[] = hash('sha256', str_replace("\r\n", "\n", file_get_contents(PERRO_ROOT . '/.htaccess')));
@@ -56,22 +56,8 @@ function perro_release_id(): string
 }
 header('X-Perro-Release: ' . perro_release_id());
 
-foreach ([PERRO_STORAGE, PERRO_DATA, PERRO_UPLOADS] as $directory) {
-    if (!is_dir($directory)) {
-        @mkdir($directory, 0755, true);
-    }
-}
-
-foreach (['dogs', 'submissions', 'reports', 'moderation', 'settings', 'security', 'archive', 'notifications'] as $dataset) {
-    $file = PERRO_DATA . '/' . $dataset . '.json';
-    if (!is_file($file)) {
-        $newFile = @fopen($file, 'x');
-        if ($newFile) {
-            fwrite($newFile, "[]\n");
-            fclose($newFile);
-        }
-    }
-}
+require_once __DIR__ . '/storage.php';
+require_once __DIR__ . '/access.php';
 
 function h(?string $value): string
 {
@@ -315,3 +301,6 @@ set_exception_handler(static function (Throwable $error): void {
         echo 'Servicio temporalmente no disponible.';
     }
 });
+
+// Run after the safe exception handler is registered.
+storage_prepare();

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 function dataset_path(string $name): string
 {
-    $allowed = ['dogs', 'submissions', 'reports', 'moderation', 'settings', 'security', 'archive', 'notifications'];
+    $allowed = storage_dataset_names();
     if (!in_array($name, $allowed, true)) {
         throw new InvalidArgumentException('Dataset no permitido.');
     }
@@ -18,10 +18,7 @@ function read_dataset(string $name): array
     return with_data_read_lock(static function () use ($name): array {
         $json = @file_get_contents(dataset_path($name));
         $decoded = $json === false ? null : json_decode($json, true);
-        if (!is_array($decoded) || !array_is_list($decoded)
-            || array_filter($decoded, static fn($record): bool => !is_array($record) || !is_string($record['id'] ?? null))) {
-            throw new RuntimeException('No se puede leer el archivo de registros: ' . $name);
-        }
+        storage_validate_records($name, $decoded);
         $GLOBALS['perro_dataset_reads'][$name] = ($GLOBALS['perro_dataset_reads'][$name] ?? 0) + 1;
         return $GLOBALS['perro_datasets'][$name] = array_map(static fn(array $record): array => normalize_record($name, $record), $decoded);
     });
@@ -89,17 +86,7 @@ function with_data_lock(callable $operation): mixed
     $GLOBALS['perro_lock_depth'] = $depth;
     clear_dataset_cache();
     try {
-        $journal = PERRO_DATA . '/transaction.json';
-        if (is_file($journal)) {
-            $pending = json_decode((string) @file_get_contents($journal), true);
-            if (!is_array($pending) || !$pending) throw new RuntimeException('Diario de guardado inválido.');
-            foreach ($pending as $name => $records) {
-                if (!is_array($records) || !write_dataset($name, $records)) {
-                    throw new RuntimeException('No se pudo recuperar el guardado pendiente.');
-                }
-            }
-            if (!@unlink($journal)) throw new RuntimeException('No se pudo finalizar la recuperación.');
-        }
+        storage_recover_transaction();
         return $operation();
     } finally {
         $depth--;
@@ -112,14 +99,9 @@ function with_data_lock(callable $operation): mixed
 function commit_datasets(array $datasets): bool
 {
     return with_data_lock(static function () use ($datasets): bool {
-        foreach ($datasets as $name => $records) dataset_path($name);
+        foreach ($datasets as $name => $records) { dataset_path($name); storage_validate_records($name, $records); }
         $journal = PERRO_DATA . '/transaction.json';
-        $temp = $journal . '.tmp-' . bin2hex(random_bytes(4));
-        $json = json_encode($datasets, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        if ($json === false || @file_put_contents($temp, $json, LOCK_EX) === false || !@rename($temp, $journal)) {
-            @unlink($temp);
-            return false;
-        }
+        if (!storage_write_json($journal, $datasets)) return false;
         foreach ($datasets as $name => $records) {
             if (!write_dataset($name, $records)) throw new RuntimeException('Guardado pendiente de recuperación.');
         }
@@ -131,17 +113,7 @@ function commit_datasets(array $datasets): bool
 function write_dataset(string $name, array $records): bool
 {
     $file = dataset_path($name);
-    $temp = $file . '.tmp-' . bin2hex(random_bytes(4));
-    $json = json_encode(array_values($records), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if ($json === false || @file_put_contents($temp, $json . "\n", LOCK_EX) === false) {
-        @unlink($temp);
-        return false;
-    }
-    if (DIRECTORY_SEPARATOR === '\\' && is_file($file)) {
-        @unlink($file);
-    }
-    $saved = @rename($temp, $file);
-    if (!$saved) @unlink($temp);
+    $saved = storage_write_json($file, array_values($records));
     if ($saved) {
         $GLOBALS['perro_datasets'][$name] = array_map(static fn(array $r): array => normalize_record($name, $r), array_values($records));
         unset($GLOBALS['perro_indexes'][$name]);

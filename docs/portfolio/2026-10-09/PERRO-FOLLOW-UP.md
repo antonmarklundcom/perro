@@ -1,0 +1,13 @@
+# Perro: próximo trabajo de runtime — v1.0.0
+
+Estas son instrucciones para una tarea separada. Aquí solo se añade documentación desde `origin/main` en un worktree propio; no se cambia runtime ni el checkout activo de Perro.
+
+Primero leer AGENTS.md, revisar main/PRs/cambios concurrentes y [acuerdo](MASCOTA-PERRO-AGREEMENT.md). Conservar consentimiento, contactos privados, fotos reales, expiración, moderación, estados, storage y adoptado/reunido. Adopciones gratuitas y pagos desactivados.
+
+1. **Avisos guardados sin cuenta:** favorito manual de código/slug público en navegador, sin copiar contacto ni fotos a una base privada. Explicar qué se guarda, botón para limpiar, comprobar estado al volver; terminado/retirado/expirado deja de ofrecer contacto. No inventar disponibilidad. Testear retirada y preferencias de privacidad; un favorito no es reserva.
+2. **Feed de avisos recientes vigentes:** RSS/Atom con URLs y texto público mínimo, sin teléfonos/email/contacto privado ni originales. Solo activos y consentidos. Revalidar al servir y retirar avisos/medios por las mismas reglas; caché breve y política para copias ya descargadas. Diferenciar fecha de publicación de renovación; sin fechas nuevas ficticias para SEO.
+3. **Actualizaciones comunitarias:** revisión original de avisos/novedades vigentes y resultados confirmados, con permiso para cualquier historia/foto de personas. No crear archivos por fecha vacíos, estadísticas inventadas o atribución a Perro sin confirmación. Respetar capacidad de moderación.
+4. **Mascota care links:** después de lanzamiento comprobar 200/contenido/robots/canonical de `/mascotas/perros/razas/`, `/mascotas/perros/razas/labrador/`, `/productos/comida-para-perros/`, `/cuidados/elegir-veterinaria/`, `/cuidados/vomitos-en-perros/`. Solo entonces proponer `PERRO_MASCOTA_GUIDES_ENABLED=1`; no cambia canonicals ni se intercambian enlaces masivos. Mantener propietario común declarado y avisos íntegros.
+5. **Newsletter opcional posterior:** infraestructura real, alta/verificación/baja, consentimiento separado y política/operador/transporte. No enrolar remitentes de adopción ni mandar recordatorios automáticamente desde esta preparación.
+
+Elegir primero favoritos + feed por utilidad y bajo trabajo recurrente; publicaciones comunitarias necesitan responsable y frecuencia sostenible. No abrir landings raza/ciudad con la plantilla sin demanda, información original e inventario real. Correr lint/regresiones PHP y privacy/audit/SEO de Perro en copias aisladas, pruebas de retiro/expiración y escritorio/móvil. Preparar PR distinto, no merge/deploy ni mensajes externos.
